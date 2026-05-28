@@ -1,4 +1,4 @@
-# Walle Web — PHP 8.2 in Docker，MySQL 使用宿主机（不在 compose 里起库）
+# Walle Web — 容器内 Nginx + PHP 8.2-FPM，MySQL 使用宿主机
 #
 # 启动：cp .env.example .env && 编辑数据库连接 → docker compose up -d --build
 # 访问：http://localhost:8080

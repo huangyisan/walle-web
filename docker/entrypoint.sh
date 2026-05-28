@@ -4,7 +4,7 @@ set -e
 APP_DIR=/opt/walle-web
 DEPLOY_ROOT=/data/walle-deploy
 
-# www-data 作为 Apache / git / rsync 执行用户
+# www-data 作为 PHP-FPM / git / rsync 执行用户
 install -d -m 700 -o www-data -g www-data /var/www/.ssh
 
 # 挂载宿主机 SSH 目录 → 复制到 www-data 家目录（避免只读挂载权限不对）

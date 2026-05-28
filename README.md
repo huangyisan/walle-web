@@ -73,8 +73,10 @@ chmod 600 docker/ssh/id_ed25519
 ssh-keyscan github.com >> docker/ssh/known_hosts
 
 docker compose up -d --build
-# 浏览器 http://localhost:8080
+# 浏览器 http://localhost:8080（容器内 Nginx + PHP 8.2-FPM）
 ```
+
+宿主机已有 Nginx 时，可反代到 `127.0.0.1:8080`，示例见 `docker/nginx-host.example.conf`。
 
 Walle 项目配置里 **检出目录 deploy_from** 填：`/data/walle-deploy`。  
 容器内 git/ssh 用户为 **www-data**。
