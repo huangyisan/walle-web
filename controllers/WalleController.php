@@ -73,6 +73,11 @@ class WalleController extends Controller {
         }
         // 清除历史记录
         Record::deleteAll(['task_id' => $this->task->id]);
+        // 重新发起部署前先恢复到可执行态，避免轮询在首条 record 产生前误判为 FAILED
+        if ($this->task->status == TaskModel::STATUS_FAILED) {
+            $this->task->status = TaskModel::STATUS_PASS;
+            $this->task->save(false, ['status']);
+        }
 
         // 项目配置
         $this->conf = Project::getConf($this->task->project_id);
@@ -372,7 +377,7 @@ class WalleController extends Controller {
         }
         $payload = $this->buildDeployProcessPayload();
         $msg = '';
-        if ((int)$payload['status'] === 0) {
+        if ((int)$payload['status'] === 0 && (int)$payload['percent'] > 0) {
             $msg = Record::getActionLabel((int)$payload['percent']);
         }
         $this->renderJson($payload, self::SUCCESS, $msg);
@@ -392,11 +397,11 @@ class WalleController extends Controller {
             ->one();
 
         if (!$record) {
+            $isFailed = ($fallbackMsg !== '');
             $taskStatus = (int)$this->task->status;
-            $isFailed = ($taskStatus === TaskModel::STATUS_FAILED);
             $isDone = ($taskStatus === TaskModel::STATUS_DONE);
             return [
-                // 还未写入首条 record 时视为进行中，避免前端误判失败
+                // 还未写入首条 record 时视为进行中；仅在显式失败（fallbackMsg）时标记失败
                 'status'  => $isFailed ? 0 : 1,
                 'percent' => $isDone ? 100 : 0,
                 'step'    => $isDone ? 6 : 0,
