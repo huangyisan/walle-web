@@ -37,7 +37,7 @@ class Task extends Ansible {
     }
 
     /**
-     * 在工作区内逐步执行配置命令，失败时保留完整输出
+     * 在同一 shell 上下文执行多行任务（支持 export/nvm 等跨行依赖）
      *
      * @param array  $tasks
      * @param string $version
@@ -51,28 +51,26 @@ class Task extends Ansible {
         $workspace = rtrim(Project::getDeployWorkspace($version), '/');
         $pattern = ['#{WORKSPACE}#'];
         $replace = [$workspace];
-        $logs = [];
         $commandsRun = [];
-        $step = 0;
 
         foreach ($tasks as $taskLine) {
             $taskLine = trim(preg_replace($pattern, $replace, $taskLine));
             if ($taskLine === '') {
                 continue;
             }
-            $step++;
-            $command = '. /etc/profile && cd ' . escapeshellarg($workspace) . ' && ' . $taskLine;
             $commandsRun[] = $taskLine;
-            if (!$this->runLocalCommand($command)) {
-                $logs[] = sprintf("[步骤 %d 失败] $ %s\n%s", $step, $taskLine, $this->getExeLog());
-                $this->setExecutionResult(implode("\n", $commandsRun), implode("\n\n", $logs));
-                return false;
-            }
-            $logs[] = sprintf("[步骤 %d 成功] $ %s\n%s", $step, $taskLine, $this->getExeLog());
         }
 
-        $this->setExecutionResult(implode("\n", $commandsRun), implode("\n\n", $logs));
-        return true;
+        if (empty($commandsRun)) {
+            return true;
+        }
+
+        $command = '. /etc/profile && cd ' . escapeshellarg($workspace) . ' && ' . implode(' && ', $commandsRun);
+        $ret = $this->runLocalCommand($command);
+        // command 保持为用户配置的多行内容，便于在页面查看
+        $this->setExecutionResult(implode("\n", $commandsRun), $this->getExeLog());
+
+        return $ret;
     }
 
     /**
