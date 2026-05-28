@@ -6,8 +6,8 @@
  *
  * 也可用环境变量覆盖数据库（见下方 WALLE_DB_*）。
  */
-defined('YII_DEBUG') or define('YII_DEBUG', true);
-defined('YII_ENV') or define('YII_ENV', 'dev');
+defined('YII_DEBUG') or define('YII_DEBUG', false);
+defined('YII_ENV') or define('YII_ENV', 'prod');
 
 return [
     'language' => 'zh-CN',
@@ -23,7 +23,7 @@ return [
         ],
         'mail' => [
             // 开发环境可先 true：邮件写入 runtime/mail 而不真实发送
-            'useFileTransport' => true,
+            'useFileTransport' => false,
             'transport'        => [
                 'scheme'   => 'smtp',
                 'host'     => getenv('WALLE_MAIL_HOST') ?: 'smtp.example.com',

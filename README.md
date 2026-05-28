@@ -42,14 +42,27 @@ That's all. It's base package of PHP environment!
 
 Installation
 ------------
+
+## composer安装
+```shell
+php8.2 -v   # 先确认 8.2 可用
+cd /tmp
+curl -sS https://getcomposer.org/installer -o composer-setup.php
+php8.2 composer-setup.php
+sudo mv composer.phar /usr/local/bin/composer
+sudo chmod +x /usr/local/bin/composer
+rm composer-setup.php
+composer -V
+```
+
 ```
 git clone git@github.com:meolu/walle-web.git
 cd walle-web
 cp config/local.php.dist config/local.php   # 生成本地配置（不入库）
 vi config/local.php                           # 改数据库密码、cookieValidationKey 等
-composer install
-php yii migrate/up --interactive=0
-php yii walle/setup
+php8.2 /usr/local/bin/composer install
+php8.2 yii migrate/up --interactive=0
+php8.2 yii walle/setup --interactive=0
 ```
 
 `config/local.php` 不会随 Git 提交。克隆后从模板复制即可；未复制时 Web/控制台会临时使用 `config/local.php.dist`（仅适合本地试跑，生产务必复制并修改 `cookieValidationKey`）。
