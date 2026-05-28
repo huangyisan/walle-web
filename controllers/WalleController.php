@@ -392,10 +392,14 @@ class WalleController extends Controller {
             ->one();
 
         if (!$record) {
+            $taskStatus = (int)$this->task->status;
+            $isFailed = ($taskStatus === TaskModel::STATUS_FAILED);
+            $isDone = ($taskStatus === TaskModel::STATUS_DONE);
             return [
-                'status'  => 0,
-                'percent' => 0,
-                'step'    => 0,
+                // 还未写入首条 record 时视为进行中，避免前端误判失败
+                'status'  => $isFailed ? 0 : 1,
+                'percent' => $isDone ? 100 : 0,
+                'step'    => $isDone ? 6 : 0,
                 'memo'    => $fallbackMsg,
                 'command' => '',
             ];
