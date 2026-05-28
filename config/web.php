@@ -20,10 +20,10 @@ $config = [
             'errorAction' => 'site/error',
         ],
         'mail' => [
-            'class' => 'yii\swiftmailer\Mailer',
-            'useFileTransport' => false,
-            'transport' => [
-                'class'      => 'Swift_SmtpTransport',
+            'class'            => \yii\symfonymailer\Mailer::class,
+            'useFileTransport' => true,
+            'messageConfig'    => [
+                'charset' => 'UTF-8',
             ],
         ],
         'log'  => [

@@ -96,7 +96,7 @@ class Task extends \yii\db\ActiveRecord
     {
         return [
             [
-                'class' => TimestampBehavior::className(),
+                'class' => TimestampBehavior::class,
                 'createdAtAttribute' => 'created_at',
                 'updatedAtAttribute' => 'updated_at',
                 'value' => new Expression('NOW()'),
@@ -153,7 +153,7 @@ class Task extends \yii\db\ActiveRecord
      * @return \yii\db\ActiveQuery
      */
     public function getUser() {
-        return $this->hasOne(User::className(), ['id' => 'user_id']);
+        return $this->hasOne(User::class, ['id' => 'user_id']);
     }
 
     /**
@@ -162,7 +162,7 @@ class Task extends \yii\db\ActiveRecord
      * @return \yii\db\ActiveQuery
      */
     public function getProject() {
-        return $this->hasOne(Project::className(), ['id' => 'project_id']);
+        return $this->hasOne(Project::class, ['id' => 'project_id']);
     }
 
     /**

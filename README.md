@@ -33,7 +33,7 @@ Requirements
 ------------
 
 * Bash(git、ssh)
-* LNMP/LAMP(php5.4+)
+* LNMP/LAMP (PHP 8.0+, 推荐 8.2)
 * Composer
 * Ansible(Optional)
 
@@ -75,21 +75,24 @@ you would like to adjust some params to make walle suited for your company.
     ]
     ```
 
-* Configure email smtp
+* Configure email smtp（在 `config/local.php` 的 `components.mail` 中）
     ```php
-    vi config/local.php
-
-    'transport' => [
-            'host'       => 'smtp.huamanshu.com',
-            'username'   => 'service@huamanshu.com',
-            'password'   => 'K84erUuxg1bHqrfD',
-            'port'       => 25,
-            'encryption' => 'tls',
+    'components' => [
+        'mail' => [
+            'useFileTransport' => false,
+            'transport' => [
+                'scheme'   => 'smtp',
+                'host'     => 'smtp.example.com',
+                'username' => 'service@example.com',
+                'password' => 'your-password',
+                'port'     => 587,
+            ],
+            'messageConfig' => [
+                'charset' => 'UTF-8',
+                'from'    => ['service@example.com' => 'Walle'],
+            ],
         ],
-        'messageConfig' => [
-            'charset' => 'UTF-8',
-            'from'    => ['service@huamanshu.com' => '花满树出品'],  // the same with username of mail module in config/web.php
-        ],
+    ],
     ```
 
 * Configure the path for log

@@ -1,4 +1,83 @@
-/vendor
+# Composer
+/vendor/
+composer.phar
+composer-setup.php
+/auth.json
+
+# 本地配置与密钥（提交 config/local.php.dist 作为模板）
 /config/local.php
-tests/_output/*
+/config/console-local.php
+/config/params-local.php
+.env
+.env.*
+!.env.example
+
+# Yii 运行时与发布资源
+/runtime/*
+!/runtime/.gitignore
+!/runtime/debug/
+!/runtime/debug/.gitignore
+!/runtime/logs/
+!/runtime/logs/.gitignore
+/web/assets/*
+!/web/assets/.gitignore
+
+# 用户上传头像（仓库内已有的 default/avatar*.jpg 等默认图会继续跟踪）
+/web/dist/avatars/*
+!/web/dist/avatars/avatar*.png
+!/web/dist/avatars/avatar.png
+!/web/dist/avatars/default.jpg
+!/web/dist/avatars/profile-pic.jpg
+!/web/dist/avatars/user.jpg
+
+# 测试输出
+/tests/_output/*
+!/tests/_output/.gitignore
+/tests/codeception/_output/*
+!/tests/codeception/_output/.gitignore
+
+# Codeception 构建产物（codecept build 可重新生成）
+/tests/codeception/_support/_generated/
+
+# IDE
 .idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+.project
+.buildpath
+.settings/
+nbproject/
+
+# 操作系统
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# PHP / 工具缓存
+.phpunit.result.cache
+.php-cs-fixer.cache
+.phpstan.cache
+
+# 日志与临时文件
+*.log
+*.cache
+*.tmp
+*.swp
+*.bak
+
+# 前端（若本地装了 npm）
+node_modules/
+
+# 压缩包与本地杂项
+*.zip
+*.tar
+*.tar.gz
+*.rar
+/test.html
+/TODO

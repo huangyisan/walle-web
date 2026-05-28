@@ -8,9 +8,13 @@ defined('STDOUT') or define('STDOUT', fopen('php://stdout', 'w'));
 require(__DIR__ . '/vendor/autoload.php');
 require(__DIR__ . '/vendor/yiisoft/yii2/Yii.php');
 
+$localPath = __DIR__ . '/config/local.php';
+if (!is_file($localPath)) {
+    $localPath = __DIR__ . '/config/local.php.dist';
+}
 $web = yii\helpers\ArrayHelper::merge(
     require(__DIR__.'/config/web.php'),
-    require(__DIR__.'/config/local.php')
+    require($localPath)
 );
 // Build web configuration
 $config = require(__DIR__.'/config/console.php');

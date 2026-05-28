@@ -1,0 +1,30 @@
+<?php
+/**
+ * Copy to config/local.php and adjust for your environment.
+ */
+defined('YII_DEBUG') or define('YII_DEBUG', true);
+defined('YII_ENV') or define('YII_ENV', 'dev');
+
+return [
+    'components' => [
+        'db' => [
+            'dsn'      => 'mysql:host=127.0.0.1;dbname=walle',
+            'username' => 'root',
+            'password' => '',
+        ],
+        'mail' => [
+            'useFileTransport' => true,
+            'transport'        => [
+                'scheme'   => 'smtp',
+                'host'     => 'smtp.example.com',
+                'username' => 'service@example.com',
+                'password' => 'your-password',
+                'port'     => 587,
+            ],
+            'messageConfig'    => [
+                'charset' => 'UTF-8',
+                'from'    => ['service@example.com' => 'Walle'],
+            ],
+        ],
+    ],
+];
