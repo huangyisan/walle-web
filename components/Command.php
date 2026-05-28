@@ -60,16 +60,84 @@ class Command {
         $this->log('---- Executing: $ ' . $command);
 
         $status = 1;
-        $log = '';
+        $stdout = '';
+        $stderr = '';
 
-        exec($command . ' 2>&1', $log, $status);
+        // 使用 proc_open 分别捕获 stdout/stderr，避免复杂命令输出丢失
+        if (function_exists('proc_open')) {
+            $descriptorSpec = [
+                0 => ['pipe', 'r'],
+                1 => ['pipe', 'w'],
+                2 => ['pipe', 'w'],
+            ];
+            $process = @proc_open($command, $descriptorSpec, $pipes);
+            if (is_resource($process)) {
+                fclose($pipes[0]);
+                stream_set_blocking($pipes[1], false);
+                stream_set_blocking($pipes[2], false);
+
+                while (true) {
+                    $read = [];
+                    if (!feof($pipes[1])) {
+                        $read[] = $pipes[1];
+                    }
+                    if (!feof($pipes[2])) {
+                        $read[] = $pipes[2];
+                    }
+                    if (empty($read)) {
+                        break;
+                    }
+                    $write = null;
+                    $except = null;
+                    // 200ms 轮询，兼顾实时读取与稳定性
+                    $changed = @stream_select($read, $write, $except, 0, 200000);
+                    if ($changed === false) {
+                        break;
+                    }
+                    foreach ($read as $stream) {
+                        $chunk = stream_get_contents($stream);
+                        if ($chunk === false || $chunk === '') {
+                            continue;
+                        }
+                        if ($stream === $pipes[1]) {
+                            $stdout .= $chunk;
+                        } else {
+                            $stderr .= $chunk;
+                        }
+                    }
+                }
+
+                fclose($pipes[1]);
+                fclose($pipes[2]);
+                $status = proc_close($process);
+            } else {
+                // proc_open 不可用时，回退到 exec
+                $fallback = [];
+                exec($command . ' 2>&1', $fallback, $status);
+                $stdout = implode(PHP_EOL, $fallback);
+            }
+        } else {
+            $fallback = [];
+            exec($command . ' 2>&1', $fallback, $status);
+            $stdout = implode(PHP_EOL, $fallback);
+        }
+
         // 执行过的命令
         $this->command = $command;
         // 执行的状态
         $this->status = ($status === 0);
+
+        $parts = [];
+        if (trim($stdout) !== '') {
+            $parts[] = rtrim($stdout);
+        }
+        if (trim($stderr) !== '') {
+            $parts[] = '[stderr]';
+            $parts[] = rtrim($stderr);
+        }
+
         // 操作日志（含退出码，便于页面上定位 yarn/npm 等失败）
-        $log = implode(PHP_EOL, $log);
-        $this->log = trim($log);
+        $this->log = trim(implode(PHP_EOL, $parts));
         if ($this->log !== '') {
             $this->log .= PHP_EOL;
         }
