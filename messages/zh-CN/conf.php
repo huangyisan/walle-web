@@ -69,6 +69,8 @@ return [
 
     'index' => '项目配置',
     'index search placeholder' => '项目名称',
+    'index search repo placeholder' => 'Git/SVN 仓库地址（repo_url）',
+    'index search host placeholder' => '机器 IP（在 hosts 中查询）',
     'create project' => '新建项目',
     'p_name' => '项目名称',
     'p_env' => '环境',

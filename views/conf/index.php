@@ -7,18 +7,26 @@ use yii\helpers\Url;
 ?>
 <div class="box">
     <div class="box-header">
-        <form action="/conf/" method="POST">
-            <input type="hidden" value="<?= \Yii::$app->request->getCsrfToken(); ?>" name="_csrf">
+        <form action="/conf/" method="GET">
             <div class="col-xs-12 col-sm-8" style="padding-left: 0;margin-bottom: 10px;">
-                <div class="input-group">
-                    <input type="text" name="kw" class="form-control search-query" placeholder="<?= yii::t('conf', 'index search placeholder') ?>">
-                    <span class="input-group-btn">
-                        <button type="submit"
-                                class="btn btn-default btn-sm">
-                            Search
-                            <i class="icon-search icon-on-right bigger-110"></i>
-                        </button>
-                    </span>
+                <div class="row">
+                    <div class="col-xs-12 col-sm-4" style="margin-bottom: 8px;">
+                        <input type="text" name="kw" value="<?= isset($kw) ? $kw : '' ?>" class="form-control search-query" placeholder="<?= yii::t('conf', 'index search placeholder') ?>">
+                    </div>
+                    <div class="col-xs-12 col-sm-4" style="margin-bottom: 8px;">
+                        <input type="text" name="repo" value="<?= isset($repo) ? $repo : '' ?>" class="form-control search-query" placeholder="<?= yii::t('conf', 'index search repo placeholder') ?>">
+                    </div>
+                    <div class="col-xs-12 col-sm-4" style="margin-bottom: 8px;">
+                        <div class="input-group">
+                            <input type="text" name="host" value="<?= isset($host) ? $host : '' ?>" class="form-control search-query" placeholder="<?= yii::t('conf', 'index search host placeholder') ?>">
+                            <span class="input-group-btn">
+                                <button type="submit" class="btn btn-default btn-sm">
+                                    Search
+                                    <i class="icon-search icon-on-right bigger-110"></i>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </form>

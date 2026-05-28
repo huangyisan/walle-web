@@ -33,13 +33,27 @@ class ConfController extends Controller
     public function actionIndex() {
         $project = Project::find()
             ->where(['user_id' => $this->uid]);
-        $kw = \Yii::$app->request->post('kw');
+        $request = \Yii::$app->request;
+        // 兼容历史 POST 搜索，同时支持 GET 参数（便于分享筛选链接）
+        $kw = trim((string)$request->get('kw', $request->post('kw', '')));
+        $repo = trim((string)$request->get('repo', $request->post('repo', '')));
+        $host = trim((string)$request->get('host', $request->post('host', '')));
+
         if ($kw) {
             $project->andWhere(['like', "name", $kw]);
+        }
+        if ($repo) {
+            $project->andWhere(['like', 'repo_url', $repo]);
+        }
+        if ($host) {
+            $project->andWhere(['like', 'hosts', $host]);
         }
         $project = $project->asArray()->all();
         return $this->render('index', [
             'list' => $project,
+            'kw' => $kw,
+            'repo' => $repo,
+            'host' => $host,
         ]);
     }
 

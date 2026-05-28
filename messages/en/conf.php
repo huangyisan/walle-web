@@ -67,6 +67,8 @@ return [
 
     'index' => 'Project Configuration',
     'index search placeholder' => 'project name',
+    'index search repo placeholder' => 'Git/SVN repo url',
+    'index search host placeholder' => 'machine IP in hosts',
     'create project' => 'Configure A Project',
     'p_name' => 'Name',
     'p_env' => 'Env',
