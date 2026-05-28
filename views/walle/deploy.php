@@ -20,6 +20,18 @@ use yii\helpers\Url;
         /*float: right;*/
         margin-left: 30px;
     }
+    .deploy-error-log {
+        max-height: 420px;
+        overflow: auto;
+        text-align: left;
+        white-space: pre-wrap;
+        word-break: break-word;
+        background: #f9f2f4;
+        border: 1px solid #eed3d7;
+        padding: 10px;
+        margin-top: 8px;
+        font-size: 12px;
+    }
 </style>
 <div class="box" style="height: 100%">
     <h4 class="box-title header smaller red">
@@ -65,22 +77,53 @@ use yii\helpers\Url;
 
 <script type="text/javascript">
     $(function() {
+        function escapeHtml(text) {
+            if (text === null || text === undefined) {
+                return '';
+            }
+            return $('<div/>').text(String(text)).html();
+        }
+
+        function showDeployError(o, data) {
+            data = data || {};
+            var step = data.step || 0;
+            if (step > 0) {
+                $('.step-' + step).removeClass('text-yellow').addClass('text-red');
+            }
+            $('.progress-status').removeClass('progress-bar-success').addClass('progress-bar-danger');
+            var title = o.msg || '<?= yii::t('walle', 'deploy failed') ?>';
+            var cmd = data.command || '';
+            var memo = data.memo || o.msg || '';
+            var html = '<p><strong>' + escapeHtml(title) + '</strong></p>';
+            if (cmd) {
+                html += '<p><code style="white-space:pre-wrap;">' + escapeHtml(cmd) + '</code></p>';
+            }
+            if (memo) {
+                html += '<pre class="deploy-error-log">' + escapeHtml(memo) + '</pre>';
+            }
+            $('.error-msg').html(html);
+            $('.result-failed').show();
+        }
+
         $('.btn-deploy').click(function() {
             $this = $(this);
             $this.addClass('disabled');
             var task_id = $(this).data('id');
-            var action = '';
-            var detail = '';
             var timer;
             $.post("<?= Url::to('@web/walle/start-deploy') ?>", {taskId: task_id}, function(o) {
-                action = o.code ? o.msg + ':' : '';
                 if (o.code != 0) {
                     clearInterval(timer);
-                    $('.progress-status').removeClass('progress-bar-success').addClass('progress-bar-danger');
-                    $('.error-msg').text(action + detail);
-                    $('.result-failed').show();
+                    showDeployError(o, o.data || {});
                     $this.removeClass('disabled');
                 }
+            }).fail(function(xhr) {
+                clearInterval(timer);
+                var o = {msg: '<?= yii::t('walle', 'deploy failed') ?>'};
+                try {
+                    o = JSON.parse(xhr.responseText);
+                } catch (e) {}
+                showDeployError(o, o.data || {});
+                $this.removeClass('disabled');
             });
             $('.progress-status').attr('aria-valuenow', 10).width('10%');
             $('.result-failed').hide();
@@ -90,11 +133,7 @@ use yii\helpers\Url;
                     // 执行失败
                     if (0 == data.status) {
                         clearInterval(timer);
-                        $('.step-' + data.step).removeClass('text-yellow').addClass('text-red');
-                        $('.progress-status').removeClass('progress-bar-success').addClass('progress-bar-danger');
-                        detail = o.msg + ':' + data.memo + '<br>' + data.command;
-                        $('.error-msg').html(action + detail);
-                        $('.result-failed').show();
+                        showDeployError(o, data);
                         $this.removeClass('disabled');
                         return;
                     } else {

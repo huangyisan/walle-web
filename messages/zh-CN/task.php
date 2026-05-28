@@ -28,6 +28,7 @@ return [
     'submit task title' => '提交上线单',
     'select branches' => '选取分支',
     'all branches' => '查看所有分支',
+    'loading branches' => '加载分支中…',
     'select branch' => '版本选取',
     'submit title' => '上线单标题',
     'file list placeholder' => '1.上线指定目录：dir_name<br />2.上线指定文件：file_name<br />3.通配符 file*',

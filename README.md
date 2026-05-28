@@ -53,6 +53,32 @@ php yii walle/setup
 ```
 
 `config/local.php` 不会随 Git 提交。克隆后从模板复制即可；未复制时 Web/控制台会临时使用 `config/local.php.dist`（仅适合本地试跑，生产务必复制并修改 `cookieValidationKey`）。
+
+Docker 部署（PHP 8.2，MySQL 用宿主机）
+------------
+```bash
+# 1. 宿主机先建好库
+mysql -e "CREATE DATABASE walle DEFAULT CHARSET utf8 COLLATE utf8_general_ci;"
+
+# 2. 允许 Docker 访问（示例，按你环境改密码与网段）
+#    bind-address 勿仅 127.0.0.1；或 WALLE_DB_HOST 填宿主机内网 IP（见 .env.example）
+
+cp .env.example .env
+# 编辑 .env：WALLE_DB_PASS、WALLE_COOKIE_KEY 等
+
+# Git Deploy Key：见 docker/ssh/README.md
+mkdir -p docker/ssh
+cp ~/.ssh/id_ed25519 docker/ssh/
+chmod 600 docker/ssh/id_ed25519
+ssh-keyscan github.com >> docker/ssh/known_hosts
+
+docker compose up -d --build
+# 浏览器 http://localhost:8080
+```
+
+Walle 项目配置里 **检出目录 deploy_from** 填：`/data/walle-deploy`。  
+容器内 git/ssh 用户为 **www-data**。
+
 Or [The Most Detailed Installation Guide](https://github.com/meolu/walle-web/blob/master/docs/install-en.md), any questions refer to [FAQ](https://github.com/meolu/walle-web/blob/master/docs/faq-en.md)
 
 Quick Start

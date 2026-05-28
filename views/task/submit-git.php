@@ -23,7 +23,7 @@ use app\models\Task;
                   <i class="get-branch icon-spinner icon-spin orange bigger-125" style="display: none"></i>
               </label>
               <select name="Task[branch]" aria-hidden="true" tabindex="-1" id="branch" class="form-control select2 select2-hidden-accessible">
-                  <option value="master">master</option>
+                  <option value=""><?= yii::t('task', 'loading branches') ?></option>
               </select>
           </div>
         <?php } ?>
@@ -103,9 +103,19 @@ use app\models\Task;
         var project_id = <?= (int)$_GET['projectId'] ?>;
         var branch_name = 'pre_branch_' + project_id;
         var pre_branch = ace.cookie.get(branch_name);
-        if (pre_branch) {
-            var option = '<option value="' + pre_branch + '" selected>' + pre_branch + '</option>';
-            $('#branch').html(option)
+        function pickDefaultBranch(branches) {
+            var ids = $.map(branches, function (v) { return v.id; });
+            var pre = ace.cookie.get(branch_name);
+            if (pre && ids.indexOf(pre) !== -1) {
+                return pre;
+            }
+            if (ids.indexOf('main') !== -1) {
+                return 'main';
+            }
+            if (ids.indexOf('master') !== -1) {
+                return 'master';
+            }
+            return ids.length ? ids[0] : '';
         }
 
         function getBranchList() {
@@ -117,17 +127,16 @@ use app\models\Task;
                 if (data.code) {
                     showError(data.msg);
                 }
+                var defaultBranch = pickDefaultBranch(data.data);
                 var select = '';
                 $.each(data.data, function (key, value) {
-                    // 默认选中 master 分支
-                    var checked = value.id == 'master' ? 'selected' : '';
+                    var checked = value.id === defaultBranch ? ' selected' : '';
                     select += '<option value="' + value.id + '"' + checked + '>' + value.message + '</option>';
                 });
                 $('#branch').html(select);
                 $('.get-branch').hide();
                 $('.show-tip').show();
-                if(data.data.length == 1 || ace.cookie.get(branch_name) != 'master') {
-                    // 获取分支完成后, 一定条件重新获取提交列表
+                if (data.data.length) {
                     $('#branch').change();
                 }
 
@@ -157,8 +166,12 @@ use app\models\Task;
             getCommitList();
         });
 
-        // 页面加载完默认拉取master的commit log
-        getCommitList();
+        // 页面加载时拉取分支列表，再按默认分支（main/master/远端 HEAD）加载 commit
+        if ($('#branch').length) {
+            getBranchList();
+        } else {
+            getCommitList();
+        }
 
         // 查看所有分支提示
         $('.show-tip')

@@ -4,7 +4,10 @@ RUN apt-get update && apt-get install -y gettext-base libicu-dev \
       zlib1g-dev unzip git subversion ssh ansible && rm -rf /var/lib/apt/lists/*
 
 RUN docker-php-ext-install bcmath intl mbstring mysqli opcache pdo_mysql
-RUN a2enmod rewrite
+RUN a2enmod rewrite \
+    && usermod -d /var/www www-data \
+    && mkdir -p /data/walle-deploy /tmp/walle \
+    && chown -R www-data:www-data /data/walle-deploy /tmp/walle
 
 COPY ./ /opt/walle-web
 COPY docker/php.ini /usr/local/etc/php/conf.d/walle-web.ini

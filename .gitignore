@@ -11,6 +11,12 @@ composer-setup.php
 .env
 .env.*
 !.env.example
+docker/ssh/id_*
+docker/ssh/id_rsa
+docker/ssh/id_ed25519
+docker/ssh/*.pem
+!docker/ssh/.gitkeep
+!docker/ssh/README.md
 
 # Yii 运行时与发布资源
 /runtime/*

@@ -15,7 +15,8 @@ use app\components\Command;
  * @property integer $action
  * @property integer $at
  * @property integer $duration
- * @property integer $memo
+ * @property string $memo
+ * @property string $command
  */
 class Record extends \yii\db\ActiveRecord
 {
@@ -88,6 +89,89 @@ class Record extends \yii\db\ActiveRecord
     }
 
     /**
+     * 进度条步骤序号（对应 deploy 页 step-N）
+     *
+     * @param int $action
+     * @return int
+     */
+    public static function actionToStep($action) {
+        $map = [
+            self::ACTION_PERMSSION => 1,
+            self::ACTION_PRE_DEPLOY => 2,
+            self::ACTION_CLONE => 3,
+            self::ACTION_POST_DEPLOY => 4,
+            self::ACTION_SYNC => 5,
+            self::ACTION_UPDATE_REMOTE => 6,
+        ];
+        return isset($map[$action]) ? $map[$action] : 0;
+    }
+
+    /**
+     * 失败阶段文案
+     *
+     * @param int $action
+     * @return string
+     */
+    public static function getActionLabel($action) {
+        $labels = [
+            self::ACTION_PERMSSION => Yii::t('walle', 'process_detect'),
+            self::ACTION_PRE_DEPLOY => Yii::t('walle', 'process_pre-deploy'),
+            self::ACTION_CLONE => Yii::t('walle', 'process_checkout'),
+            self::ACTION_POST_DEPLOY => Yii::t('walle', 'process_post-deploy'),
+            self::ACTION_SYNC => Yii::t('walle', 'process_rsync'),
+            self::ACTION_UPDATE_REMOTE => Yii::t('walle', 'process_update'),
+        ];
+        return isset($labels[$action]) ? $labels[$action] : Yii::t('walle', 'deploy step unknown');
+    }
+
+    /**
+     * 兼容旧数据：memo 曾用 var_export 存储
+     *
+     * @param string $memo
+     * @return string
+     */
+    public static function normalizeMemo($memo) {
+        if ($memo === '' || $memo === null) {
+            return '';
+        }
+        if (strlen($memo) >= 2 && $memo[0] === "'" && substr($memo, -1) === "'") {
+            return stripcslashes(substr($memo, 1, -1));
+        }
+        return $memo;
+    }
+
+    /**
+     * 写入完整部署日志文件
+     *
+     * @param int    $taskId
+     * @param string $command
+     * @param string $output
+     * @return string|null 日志路径
+     */
+    public static function writeDeployLogFile($taskId, $command, $output) {
+        if (empty(Yii::$app->params['log.dir'])) {
+            return null;
+        }
+        $logDir = Yii::$app->params['log.dir'];
+        if (!is_dir($logDir) && !@mkdir($logDir, 0755, true)) {
+            return null;
+        }
+        $baseDir = realpath($logDir) ?: $logDir;
+        $path = rtrim($baseDir, '/') . '/deploy-task-' . $taskId . '-' . date('YmdHis') . '.log';
+        $body = "=== Walle deploy log ===\n"
+            . 'time: ' . date('Y-m-d H:i:s') . "\n"
+            . "task_id: {$taskId}\n\n"
+            . "=== command ===\n"
+            . $command . "\n\n"
+            . "=== output ===\n"
+            . $output;
+        if (@file_put_contents($path, $body) === false) {
+            return null;
+        }
+        return $path;
+    }
+
+    /**
      * 保存记录
      *
      * @param Command $commandObj
@@ -97,6 +181,19 @@ class Record extends \yii\db\ActiveRecord
      * @return mixed
      */
     public static function saveRecord(Command $commandObj, $task_id, $action, $duration) {
+        $command = $commandObj->getExeCommand();
+        $output = $commandObj->getExeLog();
+        $logFile = static::writeDeployLogFile($task_id, $command, $output);
+
+        $memo = $output;
+        if ($logFile) {
+            $memo .= "\n\n---\n" . Yii::t('walle', 'full log file', ['path' => $logFile]);
+        }
+        if (strlen($memo) > 65530) {
+            $memo = substr($memo, -65530);
+            $memo = Yii::t('walle', 'log truncated') . "\n\n" . $memo;
+        }
+
         $record = new static();
         $record->attributes = [
             'user_id'    => \Yii::$app->user->id,
@@ -104,8 +201,8 @@ class Record extends \yii\db\ActiveRecord
             'status'     => (int)$commandObj->getExeStatus(),
             'action'     => $action,
             'created_at' => time(),
-            'command'    => var_export($commandObj->getExeCommand(), true),
-            'memo'       => substr(var_export($commandObj->getExeLog(), true), 0, 65530),
+            'command'    => $command,
+            'memo'       => $memo,
             'duration'   => $duration,
         ];
         return $record->save();

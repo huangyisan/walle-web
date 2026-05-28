@@ -20,25 +20,8 @@ class Task extends Ansible {
      */
     public function preDeploy($version) {
         $tasks = GlobalHelper::str2arr($this->getConfig()->pre_deploy);
-        if (empty($tasks)) return true;
 
-        // 本地可能要做一些依赖环境变量的命令操作
-        $cmd = ['. /etc/profile'];
-        $workspace = rtrim(Project::getDeployWorkspace($version), '/');
-        $pattern = [
-            '#{WORKSPACE}#',
-        ];
-        $replace = [
-            $workspace,
-        ];
-
-        // 简化用户切换目录，直接切换到当前部署空间：{deploy_from}/{env}/{project}-YYmmdd-HHiiss
-        $cmd[] = "cd {$workspace}";
-        foreach ($tasks as $task) {
-            $cmd[] = preg_replace($pattern, $replace, $task);
-        }
-        $command = join(' && ', $cmd);
-        return $this->runLocalCommand($command);
+        return $this->runWorkspaceTasks($tasks, $version);
     }
 
     /**
@@ -49,25 +32,47 @@ class Task extends Ansible {
      */
     public function postDeploy($version) {
         $tasks = GlobalHelper::str2arr($this->getConfig()->post_deploy);
-        if (empty($tasks)) return true;
 
-        // 本地可能要做一些依赖环境变量的命令操作
-        $cmd = ['. /etc/profile'];
-        $workspace = rtrim(Project::getDeployWorkspace($version), '/');
-        $pattern = [
-            '#{WORKSPACE}#',
-        ];
-        $replace = [
-            $workspace,
-        ];
+        return $this->runWorkspaceTasks($tasks, $version);
+    }
 
-        // 简化用户切换目录，直接切换到当前部署空间：{deploy_from}/{env}/{project}-YYmmdd-HHiiss
-        $cmd[] = "cd {$workspace}";
-        foreach ($tasks as $task) {
-            $cmd[] = preg_replace($pattern, $replace, $task);
+    /**
+     * 在工作区内逐步执行配置命令，失败时保留完整输出
+     *
+     * @param array  $tasks
+     * @param string $version
+     * @return bool
+     */
+    protected function runWorkspaceTasks(array $tasks, $version) {
+        if (empty($tasks)) {
+            return true;
         }
-        $command = join(' && ', $cmd);
-        return $this->runLocalCommand($command);
+
+        $workspace = rtrim(Project::getDeployWorkspace($version), '/');
+        $pattern = ['#{WORKSPACE}#'];
+        $replace = [$workspace];
+        $logs = [];
+        $commandsRun = [];
+        $step = 0;
+
+        foreach ($tasks as $taskLine) {
+            $taskLine = trim(preg_replace($pattern, $replace, $taskLine));
+            if ($taskLine === '') {
+                continue;
+            }
+            $step++;
+            $command = '. /etc/profile && cd ' . escapeshellarg($workspace) . ' && ' . $taskLine;
+            $commandsRun[] = $taskLine;
+            if (!$this->runLocalCommand($command)) {
+                $logs[] = sprintf("[步骤 %d 失败] $ %s\n%s", $step, $taskLine, $this->getExeLog());
+                $this->setExecutionResult(implode("\n", $commandsRun), implode("\n\n", $logs));
+                return false;
+            }
+            $logs[] = sprintf("[步骤 %d 成功] $ %s\n%s", $step, $taskLine, $this->getExeLog());
+        }
+
+        $this->setExecutionResult(implode("\n", $commandsRun), implode("\n\n", $logs));
+        return true;
     }
 
     /**
@@ -145,4 +150,3 @@ class Task extends Ansible {
     }
 
 }
-

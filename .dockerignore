@@ -1,0 +1,14 @@
+.git
+.gitignore
+.idea
+.vscode
+vendor
+runtime
+web/assets
+config/local.php
+docker/ssh/id_*
+docker/ssh/*.pem
+*.log
+tests/_output
+composer.phar
+.env

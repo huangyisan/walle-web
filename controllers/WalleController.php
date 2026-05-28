@@ -13,6 +13,7 @@ use app\components\Ansible;
 use app\components\Command;
 use app\components\Controller;
 use app\components\Folder;
+use app\components\Git;
 use app\components\Repo;
 use app\components\Task as WalleTask;
 use app\models\Project;
@@ -118,7 +119,12 @@ class WalleController extends Controller {
             // 清理本地部署空间
             $this->_cleanUpLocal($this->task->link_id);
 
-            throw $e;
+            $this->renderJson(
+                $this->buildDeployProcessPayload($e->getMessage()),
+                self::FAIL,
+                $this->getDeployFailureMessage($e->getMessage())
+            );
+            return;
         }
         $this->renderJson([]);
     }
@@ -298,12 +304,19 @@ class WalleController extends Controller {
      *
      * @param $projectId
      */
-    public function actionGetCommitHistory($projectId, $branch = 'master') {
+    public function actionGetCommitHistory($projectId, $branch = '') {
         $conf = Project::getConf($projectId);
         $revision = Repo::getRevision($conf);
         if ($conf->repo_mode == Project::REPO_MODE_TAG && $conf->repo_type == Project::REPO_GIT) {
             $list = $revision->getTagList();
         } else {
+            if ($branch === '' || $branch === null) {
+                if ($revision instanceof Git) {
+                    $branch = $revision->getDefaultBranch();
+                } else {
+                    $branch = 'trunk';
+                }
+            }
             $list = $revision->getCommitList($branch);
         }
         $this->renderJson($list);
@@ -352,15 +365,65 @@ class WalleController extends Controller {
      * @param $taskId
      */
     public function actionGetProcess($taskId) {
-        $record = Record::find()
-            ->select(['percent' => 'action', 'status', 'memo', 'command'])
-            ->where(['task_id' => $taskId,])
-            ->orderBy('id desc')
-            ->asArray()->one();
-        $record['memo'] = stripslashes($record['memo']);
-        $record['command'] = stripslashes($record['command']);
+        $this->task = TaskModel::findOne($taskId);
+        if (!$this->task) {
+            $this->renderJson([], self::FAIL, yii::t('walle', 'deployment id not exists'));
+            return;
+        }
+        $payload = $this->buildDeployProcessPayload();
+        $msg = '';
+        if ((int)$payload['status'] === 0) {
+            $msg = Record::getActionLabel((int)$payload['percent']);
+        }
+        $this->renderJson($payload, self::SUCCESS, $msg);
+    }
 
-        $this->renderJson($record);
+    /**
+     * 组装部署进度/失败详情（供轮询与 start-deploy 失败响应）
+     *
+     * @param string $fallbackMsg
+     * @return array
+     */
+    protected function buildDeployProcessPayload($fallbackMsg = '') {
+        $record = Record::find()
+            ->where(['task_id' => $this->task->id])
+            ->orderBy(['id' => SORT_DESC])
+            ->asArray()
+            ->one();
+
+        if (!$record) {
+            return [
+                'status'  => 0,
+                'percent' => 0,
+                'step'    => 0,
+                'memo'    => $fallbackMsg,
+                'command' => '',
+            ];
+        }
+
+        $action = (int)$record['action'];
+        return [
+            'status'  => (int)$record['status'],
+            'percent' => $action,
+            'step'    => Record::actionToStep($action),
+            'memo'    => Record::normalizeMemo($record['memo']),
+            'command' => stripslashes((string)$record['command']),
+        ];
+    }
+
+    /**
+     * @param string $fallbackMsg
+     * @return string
+     */
+    protected function getDeployFailureMessage($fallbackMsg = '') {
+        $record = Record::find()
+            ->where(['task_id' => $this->task->id, 'status' => 0])
+            ->orderBy(['id' => SORT_DESC])
+            ->one();
+        if ($record) {
+            return Record::getActionLabel((int)$record->action);
+        }
+        return $fallbackMsg ?: yii::t('walle', 'deploy failed');
     }
 
     /**

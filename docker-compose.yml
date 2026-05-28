@@ -1,0 +1,31 @@
+# Walle Web — PHP 8.2 in Docker，MySQL 使用宿主机（不在 compose 里起库）
+#
+# 启动：cp .env.example .env && 编辑数据库连接 → docker compose up -d --build
+# 访问：http://localhost:8080
+
+services:
+  walle:
+    build: .
+    ports:
+      - "${WALLE_HTTP_PORT:-8080}:80"
+    extra_hosts:
+      # Linux 下让容器通过 host.docker.internal 访问宿主机 MySQL
+      - "host.docker.internal:host-gateway"
+    environment:
+      WALLE_DB_DSN: mysql:host=${WALLE_DB_HOST:-host.docker.internal};dbname=${WALLE_DB_NAME:-walle};charset=utf8
+      WALLE_DB_USER: ${WALLE_DB_USER:-root}
+      WALLE_DB_PASS: ${WALLE_DB_PASS:-}
+      WALLE_COOKIE_KEY: ${WALLE_COOKIE_KEY:-change_me_in_production}
+      WALLE_LOG_PATH: /tmp/walle
+      HOME: /var/www
+    volumes:
+      - walle_deploy:/data/walle-deploy
+      - walle_runtime:/opt/walle-web/runtime
+      - walle_logs:/tmp/walle
+      - ${WALLE_SSH_DIR:-./docker/ssh}:/mnt/ssh:ro
+    restart: unless-stopped
+
+volumes:
+  walle_deploy:
+  walle_runtime:
+  walle_logs:

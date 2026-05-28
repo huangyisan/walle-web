@@ -14,14 +14,90 @@ use app\models\Task as TaskModel;
 class Git extends Command {
 
     /**
+     * 解析远程默认分支（兼容 main / master 及 origin/HEAD）
+     *
+     * @param string|null $gitDir
+     * @return string
+     */
+    public function getDefaultBranch($gitDir = null) {
+        $gitDir = $gitDir ?: Project::getDeployFromDir();
+        $dotGit = rtrim($gitDir, '/') . '/.git';
+
+        if (is_dir($dotGit)) {
+            $dir = escapeshellarg($gitDir);
+            $branch = $this->captureGitOutput(sprintf(
+                'cd %s && /usr/bin/env git symbolic-ref --quiet --short refs/remotes/origin/HEAD',
+                $dir
+            ));
+            if ($branch) {
+                $branch = preg_replace('#^origin/#', '', trim($branch));
+                if ($branch !== '' && $branch !== 'HEAD') {
+                    return $branch;
+                }
+            }
+
+            $branch = $this->captureGitOutput(sprintf(
+                'cd %s && /usr/bin/env git remote show origin 2>/dev/null | sed -n \'/HEAD branch/s/.*: //p\'',
+                $dir
+            ));
+            if ($branch) {
+                return trim($branch);
+            }
+        }
+
+        $url = $this->getConfig()->repo_url;
+        if ($url) {
+            $escapedUrl = escapeshellarg($url);
+            $out = $this->captureGitOutput(sprintf(
+                '/usr/bin/env git ls-remote --symref %s HEAD',
+                $escapedUrl
+            ));
+            if ($out && preg_match('/^ref: refs\/heads\/(\S+)/m', $out, $matches)) {
+                return $matches[1];
+            }
+
+            foreach (['main', 'master'] as $candidate) {
+                $head = $this->captureGitOutput(sprintf(
+                    '/usr/bin/env git ls-remote --heads %s %s',
+                    $escapedUrl,
+                    escapeshellarg($candidate)
+                ));
+                if ($head !== null && $head !== '') {
+                    return $candidate;
+                }
+            }
+        }
+
+        return 'main';
+    }
+
+    /**
+     * @param string $command
+     * @return string|null
+     */
+    protected function captureGitOutput($command) {
+        $output = [];
+        $status = 1;
+        exec($command . ' 2>/dev/null', $output, $status);
+        if ($status !== 0) {
+            return null;
+        }
+
+        return trim(implode(PHP_EOL, $output));
+    }
+
+    /**
      * 更新仓库
      *
-     * @param string $branch
-     * @param string $gitDir
+     * @param string|null $branch null 时使用远程默认分支
+     * @param string|null $gitDir
      * @return bool|int
      */
-    public function updateRepo($branch = 'master', $gitDir = null) {
+    public function updateRepo($branch = null, $gitDir = null) {
         $gitDir = $gitDir ?: Project::getDeployFromDir();
+        if ($branch === null || $branch === '') {
+            $branch = $this->getDefaultBranch($gitDir);
+        }
         $dotGit = rtrim($gitDir, '/') . '/.git';
         // 存在git目录，直接pull
         if (file_exists($dotGit)) {
@@ -68,7 +144,7 @@ class Git extends Command {
     public function getBranchList() {
         $destination = Project::getDeployFromDir();
         // 应该先更新，不然在remote git删除当前选中的分支后，获取分支列表会失败
-        $this->updateRepo('master', $destination);
+        $this->updateRepo(null, $destination);
         $cmd[] = sprintf('cd %s ', $destination);
         $cmd[] = '/usr/bin/env git pull -a';
         $cmd[] = '/usr/bin/env git branch -a';
@@ -102,12 +178,15 @@ class Git extends Command {
     /**
      * 获取提交历史
      *
-     * @param string $branch
+     * @param string|null $branch null 时使用远程默认分支
      * @param int $count
      * @return array
      * @throws \Exception
      */
-    public function getCommitList($branch = 'master', $count = 20) {
+    public function getCommitList($branch = null, $count = 20) {
+        if ($branch === null || $branch === '') {
+            $branch = $this->getDefaultBranch();
+        }
         // 先更新
         $destination = Project::getDeployFromDir();
         $this->updateRepo($branch, $destination);

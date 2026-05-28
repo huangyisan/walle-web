@@ -28,6 +28,7 @@ return [
     'submit task title' => 'Submit Deployment Bill',
     'select branches' => 'Select Branches',
     'all branches' => 'View All branches',
+    'loading branches' => 'Loading branches…',
     'select branch' => 'Select Branch',
     'submit title' => 'Title',
     'file list placeholder' => '1.Distribute specified directory：dir_name<br />2.Distribute specified file：file_name<br />3.Distribute specified file：file*',

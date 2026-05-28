@@ -1,0 +1,10 @@
+# 可选：复制为 docker-compose.override.yml 以挂载本机 config/local.php
+#
+#   cp docker-compose.override.yml.example docker-compose.override.yml
+#
+# 注意：宿主机必须先存在 config/local.php，否则 Docker 会创建同名空目录。
+
+services:
+  walle:
+    volumes:
+      - ./config/local.php:/opt/walle-web/config/local.php:ro

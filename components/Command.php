@@ -66,12 +66,16 @@ class Command {
         // 执行过的命令
         $this->command = $command;
         // 执行的状态
-        $this->status = !$status;
-        // 操作日志
+        $this->status = ($status === 0);
+        // 操作日志（含退出码，便于页面上定位 yarn/npm 等失败）
         $log = implode(PHP_EOL, $log);
         $this->log = trim($log);
+        if ($this->log !== '') {
+            $this->log .= PHP_EOL;
+        }
+        $this->log .= '[exit code: ' . $status . ']';
 
-        $this->log($log);
+        $this->log($this->log);
         $this->log('---------------------------------');
 
         return $this->status;
@@ -175,7 +179,18 @@ class Command {
      * @return string
      */
     public function getExeLog() {
-        return $this->log;
+        return $this->log === null ? '' : $this->log;
+    }
+
+    /**
+     * 合并多步任务输出（pre/post-deploy 逐步执行时使用）
+     *
+     * @param string $command
+     * @param string $log
+     */
+    public function setExecutionResult($command, $log) {
+        $this->command = $command;
+        $this->log = $log;
     }
 
     /**
