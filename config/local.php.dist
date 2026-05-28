@@ -1,25 +1,35 @@
 <?php
 /**
- * Copy to config/local.php and adjust for your environment.
+ * 首次部署：复制为本机配置后修改
+ *
+ *   cp config/local.php.dist config/local.php
+ *
+ * 也可用环境变量覆盖数据库（见下方 WALLE_DB_*）。
  */
 defined('YII_DEBUG') or define('YII_DEBUG', true);
 defined('YII_ENV') or define('YII_ENV', 'dev');
 
 return [
+    'language' => 'zh-CN',
     'components' => [
         'db' => [
-            'dsn'      => 'mysql:host=127.0.0.1;dbname=walle',
-            'username' => 'root',
-            'password' => '',
+            'dsn'      => getenv('WALLE_DB_DSN') ?: 'mysql:host=127.0.0.1;dbname=walle',
+            'username' => getenv('WALLE_DB_USER') ?: 'root',
+            'password' => getenv('WALLE_DB_PASS') ?: '',
+        ],
+        'request' => [
+            // 必填：复制后请改成随机字符串，例如：php -r "echo bin2hex(random_bytes(16));"
+            'cookieValidationKey' => 'CHANGE_ME_TO_A_RANDOM_SECRET_KEY',
         ],
         'mail' => [
+            // 开发环境可先 true：邮件写入 runtime/mail 而不真实发送
             'useFileTransport' => true,
             'transport'        => [
                 'scheme'   => 'smtp',
-                'host'     => 'smtp.example.com',
-                'username' => 'service@example.com',
-                'password' => 'your-password',
-                'port'     => 587,
+                'host'     => getenv('WALLE_MAIL_HOST') ?: 'smtp.example.com',
+                'username' => getenv('WALLE_MAIL_USER') ?: 'service@example.com',
+                'password' => getenv('WALLE_MAIL_PASS') ?: '',
+                'port'     => (int)(getenv('WALLE_MAIL_PORT') ?: 587),
             ],
             'messageConfig'    => [
                 'charset' => 'UTF-8',

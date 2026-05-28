@@ -45,10 +45,14 @@ Installation
 ```
 git clone git@github.com:meolu/walle-web.git
 cd walle-web
-vi config/web.php # set up module db mysql connection info
-composer install  # error cause by bower-asset, install：composer global require "fxp/composer-asset-plugin:*"
-./yii walle/setup # init walle
+cp config/local.php.dist config/local.php   # 生成本地配置（不入库）
+vi config/local.php                           # 改数据库密码、cookieValidationKey 等
+composer install
+php yii migrate/up --interactive=0
+php yii walle/setup
 ```
+
+`config/local.php` 不会随 Git 提交。克隆后从模板复制即可；未复制时 Web/控制台会临时使用 `config/local.php.dist`（仅适合本地试跑，生产务必复制并修改 `cookieValidationKey`）。
 Or [The Most Detailed Installation Guide](https://github.com/meolu/walle-web/blob/master/docs/install-en.md), any questions refer to [FAQ](https://github.com/meolu/walle-web/blob/master/docs/faq-en.md)
 
 Quick Start
