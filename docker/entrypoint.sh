@@ -30,7 +30,7 @@ else
     echo "WARN: /mnt/ssh is empty — git clone / 目标机 SSH 需在 docker/ssh 放置密钥，见 docker/ssh/README.md"
 fi
 
-install -d -m 775 -o www-data -g www-data "${DEPLOY_ROOT}" /tmp/walle "${APP_DIR}/runtime" "${APP_DIR}/web/assets"
+install -d -m 775 -o www-data -g www-data "${DEPLOY_ROOT}" /var/log/walle "${APP_DIR}/runtime" "${APP_DIR}/web/assets"
 
 # 本地配置：镜像内无 local.php 时按环境变量生成（也可在构建前 cp config/local.php.dist）
 if [ ! -f "${APP_DIR}/config/local.php" ]; then

@@ -16,12 +16,12 @@ services:
       WALLE_DB_USER: ${WALLE_DB_USER:-root}
       WALLE_DB_PASS: ${WALLE_DB_PASS:-}
       WALLE_COOKIE_KEY: ${WALLE_COOKIE_KEY:-change_me_in_production}
-      WALLE_LOG_PATH: /tmp/walle
+      WALLE_LOG_PATH: /var/log/walle
       HOME: /var/www
     volumes:
       - walle_deploy:/data/walle-deploy
       - walle_runtime:/opt/walle-web/runtime
-      - walle_logs:/tmp/walle
+      - walle_logs:/var/log/walle
       - ${WALLE_SSH_DIR:-./docker/ssh}:/mnt/ssh:ro
     restart: unless-stopped
 

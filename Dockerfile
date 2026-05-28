@@ -6,8 +6,8 @@ RUN apt-get update && apt-get install -y nginx gettext-base libicu-dev \
 
 RUN docker-php-ext-install bcmath intl mbstring mysqli opcache pdo_mysql \
     && usermod -d /var/www www-data \
-    && mkdir -p /data/walle-deploy /tmp/walle /var/log/nginx \
-    && chown -R www-data:www-data /data/walle-deploy /tmp/walle
+    && mkdir -p /data/walle-deploy /var/log/walle /var/log/nginx \
+    && chown -R www-data:www-data /data/walle-deploy /var/log/walle
 
 COPY ./ /opt/walle-web
 COPY docker/php.ini /usr/local/etc/php/conf.d/walle-web.ini
