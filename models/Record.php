@@ -4,6 +4,7 @@ namespace app\models;
 
 use Yii;
 use app\components\Command;
+use app\components\LogHelper;
 
 /**
  * This is the model class for table "record".
@@ -180,15 +181,44 @@ class Record extends \yii\db\ActiveRecord
      * @param $duration
      * @return mixed
      */
+    /**
+     * 从命令输出中解析最后一次 shell 退出码
+     *
+     * @param string $output
+     * @return int|null
+     */
+    public static function extractShellExitCode($output) {
+        if ($output === '' || $output === null) {
+            return null;
+        }
+        if (!preg_match_all('/\[exit code:\s*(-?\d+)\]/', $output, $matches)) {
+            return null;
+        }
+
+        return (int)end($matches[1]);
+    }
+
     public static function saveRecord(Command $commandObj, $task_id, $action, $duration) {
         $command = $commandObj->getExeCommand();
         $output = $commandObj->getExeLog();
         $logFile = static::writeDeployLogFile($task_id, $command, $output);
         $status = (int)$commandObj->getExeStatus();
-        if ($status === 0 && preg_match('/\[exit code:\s*0\]\s*$/', trim($output))) {
-            // 兼容 PHP proc_open/proc_close 在部分环境下误取退出码的情况：
-            // 日志明确显示 shell exit code 0 时，不应把 record 标成失败。
-            $status = 1;
+        $shellExit = static::extractShellExitCode($output);
+        if ($shellExit !== null) {
+            $expectedStatus = ($shellExit === 0) ? 1 : 0;
+            if ($status !== $expectedStatus) {
+                LogHelper::deployDecision('save_record_status_mismatch', [
+                    'reason' => 'exe_status does not match shell exit code in log',
+                    'task_id' => $task_id,
+                    'action' => $action,
+                    'exe_status' => $status,
+                    'shell_exit' => $shellExit,
+                    'corrected_status' => $expectedStatus,
+                    'command' => $command,
+                    'log_tail' => mb_substr($output, -4000, null, 'UTF-8'),
+                ]);
+                $status = $expectedStatus;
+            }
         }
 
         $memo = $output;
@@ -211,6 +241,17 @@ class Record extends \yii\db\ActiveRecord
             'memo'       => $memo,
             'duration'   => $duration,
         ];
+        if ($status === 0) {
+            LogHelper::deployDecision('save_record_failed', [
+                'reason' => 'saving record with status=0',
+                'task_id' => $task_id,
+                'action' => $action,
+                'shell_exit' => $shellExit,
+                'exe_status' => (int)$commandObj->getExeStatus(),
+                'command' => $command,
+                'log_tail' => mb_substr($output, -4000, null, 'UTF-8'),
+            ]);
+        }
         return $record->save();
     }
 }

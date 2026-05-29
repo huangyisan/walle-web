@@ -64,6 +64,19 @@ class LogHelper {
     }
 
     /**
+     * 部署失败判定诊断（同时写 deploy-decision-*.log 与 walle-*.log）
+     *
+     * @param string $stage
+     * @param array  $payload
+     */
+    public static function deployDecision($stage, array $payload = []) {
+        $payload['stage'] = $stage;
+        $message = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        self::write('deploy-decision', $message);
+        Command::log('[deploy-decision] ' . $message);
+    }
+
+    /**
      * @param array $params
      * @return array
      */

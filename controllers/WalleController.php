@@ -465,14 +465,39 @@ class WalleController extends Controller {
 
         $memo = Record::normalizeMemo($record['memo']);
         $recordStatus = (int)$record['status'];
-        if (($fallbackMsg !== '' || $taskStatus === TaskModel::STATUS_FAILED) && $recordStatus === 1) {
-            // 异常发生在某条成功 record 之后时，不要把成功命令展示成失败原因。
-            $memo = $fallbackMsg ?: yii::t('walle', 'deploy failed');
+        $shellExit = Record::extractShellExitCode($memo);
+        if ($recordStatus === 0 && $shellExit === 0) {
+            LogHelper::deployDecision('get_process_status_corrected', [
+                'reason' => 'record.status=0 but log shows exit code 0',
+                'task_id' => $this->task->id,
+                'task_status' => $taskStatus,
+                'record_id' => $record['id'] ?? null,
+                'record_action' => $record['action'] ?? null,
+                'command' => stripslashes((string)$record['command']),
+            ]);
+            $recordStatus = 1;
+        }
+        if ($fallbackMsg !== '' && $recordStatus === 1) {
+            // start-deploy 显式失败时，不把上一条成功命令当成失败详情
+            $memo = $fallbackMsg;
             $recordStatus = 0;
             $record['command'] = '';
         }
 
         $action = (int)$record['action'];
+        if ($recordStatus === 0) {
+            LogHelper::deployDecision('get_process_return_failed', [
+                'reason' => $fallbackMsg !== '' ? 'fallbackMsg set' : 'record.status=0',
+                'task_id' => $this->task->id,
+                'task_status' => $taskStatus,
+                'record_id' => $record['id'] ?? null,
+                'record_action' => $action,
+                'shell_exit' => $shellExit,
+                'fallback_msg' => $fallbackMsg,
+                'command' => stripslashes((string)$record['command']),
+                'memo_tail' => mb_substr($memo, -4000, null, 'UTF-8'),
+            ]);
+        }
         return [
             'status'  => $recordStatus,
             'percent' => $action,
@@ -521,9 +546,8 @@ class WalleController extends Controller {
             $payload['log_tail'] = mb_substr($commandObj->getExeLog(), -4000, null, 'UTF-8');
         }
 
-        $message = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        LogHelper::write('deploy-decision', $message);
-        Command::log('[deploy-decision] ' . $message);
+        $payload['reason'] = $reason;
+        LogHelper::deployDecision($stage, $payload);
     }
 
     /**
