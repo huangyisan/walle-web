@@ -108,6 +108,24 @@ class Record extends \yii\db\ActiveRecord
     }
 
     /**
+     * 项目配置中的发布阶段（与 deploy 页 step 及 record.action 对应关系见 WalleController::actionStartDeploy）
+     *
+     * @param int $action
+     * @return string
+     */
+    public static function getDeployPhase($action) {
+        $map = [
+            self::ACTION_PERMSSION => 'detect',
+            self::ACTION_PRE_DEPLOY => 'pre_deploy',
+            self::ACTION_CLONE => 'git_checkout',
+            self::ACTION_POST_DEPLOY => 'post_deploy',
+            self::ACTION_SYNC => 'sync',
+            self::ACTION_UPDATE_REMOTE => 'pre_release|link|post_release',
+        ];
+        return isset($map[$action]) ? $map[$action] : 'unknown';
+    }
+
+    /**
      * 失败阶段文案
      *
      * @param int $action

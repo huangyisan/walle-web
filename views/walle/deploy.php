@@ -135,10 +135,20 @@ use yii\helpers\Url;
                     }
                 }
             }
+            // 与后端 actionStartDeploy 一致：pre_deploy → checkout → post_deploy → 同步 → pre_release/软链/post_release
+            var TASK_STATUS_PASS = 1;
+            var TASK_STATUS_DONE = 3;
+            var TASK_STATUS_FAILED = 4;
             function isDeployDone(data) {
-                return data && 1 == data.status && (100 == data.percent || 6 == data.step);
+                if (!data) {
+                    return false;
+                }
+                if (data.task_status === TASK_STATUS_DONE) {
+                    return true;
+                }
+                return 1 == data.status && (100 == data.percent || 6 == data.step);
             }
-            function confirmDeployResult(o, dataOnFail) {
+            function confirmDeployResult(o) {
                 if (deployFinished) {
                     return;
                 }
@@ -149,17 +159,21 @@ use yii\helpers\Url;
                         markDeploySuccess();
                         return;
                     }
+                    // 二次确认仍为进行中：不要用轮询快照误报失败，继续等 start-deploy 结束
+                    if (1 == data.status && data.task_status !== TASK_STATUS_FAILED) {
+                        return;
+                    }
                     clearInterval(timer);
-                    showDeployError(o || process, dataOnFail || data || {});
+                    showDeployError(o || process, data);
                     $this.removeClass('disabled');
                 }).fail(function() {
                     clearInterval(timer);
-                    showDeployError(o || {msg: '<?= yii::t('walle', 'deploy failed') ?>'}, dataOnFail || {});
+                    showDeployError(o || {msg: '<?= yii::t('walle', 'deploy failed') ?>'}, {});
                     $this.removeClass('disabled');
                 });
             }
             function handleDeployRequestError(o) {
-                confirmDeployResult(o, o && o.data ? o.data : null);
+                confirmDeployResult(o);
             }
             $.post("<?= Url::to('@web/walle/start-deploy') ?>", {taskId: task_id}, function(o) {
                 if (deployFinished) {
@@ -172,7 +186,7 @@ use yii\helpers\Url;
                 if (o.data && o.data.warning) {
                     $('.result-success p').append(' (' + escapeHtml(o.data.warning) + ')');
                 }
-                confirmDeployResult({msg: ''}, null);
+                confirmDeployResult({msg: ''});
             }).fail(function(xhr) {
                 var o = {msg: '<?= yii::t('walle', 'deploy failed') ?>'};
                 try {
@@ -193,8 +207,9 @@ use yii\helpers\Url;
                         markDeploySuccess();
                         return;
                     }
-                    if (0 == data.status && data.percent > 0) {
-                        confirmDeployResult(o, data);
+                    // task 仍为 PASS 时后端不会返回终态失败；仅 task 已 FAILED 才二次确认
+                    if (0 == data.status && data.percent > 0 && data.task_status === TASK_STATUS_FAILED) {
+                        confirmDeployResult(o);
                         return;
                     }
                     $('.progress-status')

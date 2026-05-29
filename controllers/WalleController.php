@@ -55,6 +55,18 @@ class WalleController extends Controller {
      */
     protected $remoteServersUpdated = false;
 
+    /**
+     * 一次线上发布（actionStartDeploy）的固定顺序：
+     * 1. pre_deploy   — 宿主机，检出前（conf.pre_deploy）
+     * 2. git checkout — 更新代码
+     * 3. post_deploy  — 宿主机，检出后（conf.post_deploy）
+     * 4. sync         — scp/ansible 同步包到目标机（record ACTION_SYNC，易在轮询里被误判失败）
+     * 5. pre_release  — 目标机，切软链前（conf.pre_release，与 6、7 同条 record ACTION_UPDATE_REMOTE）
+     * 6. link         — 切换版本软链
+     * 7. post_release — 目标机，切软链后 / PM2 等（conf.post_release）
+     * 整段在单次 start-deploy 请求内同步执行；task.status 仍为 PASS 时表示尚未跑完，不得按中间 record 判整次失败。
+     */
+
     public $enableCsrfValidation = false;
 
     /**
@@ -463,11 +475,12 @@ class WalleController extends Controller {
 
         if ($taskStatus === TaskModel::STATUS_DONE) {
             return [
-                'status'  => 1,
-                'percent' => 100,
-                'step'    => 6,
-                'memo'    => $record ? Record::normalizeMemo($record['memo']) : '',
-                'command' => $record ? stripslashes((string)$record['command']) : '',
+                'status'      => 1,
+                'percent'     => 100,
+                'step'        => 6,
+                'task_status' => $taskStatus,
+                'memo'        => $record ? Record::normalizeMemo($record['memo']) : '',
+                'command'     => $record ? stripslashes((string)$record['command']) : '',
             ];
         }
 
@@ -478,16 +491,19 @@ class WalleController extends Controller {
             }
             return [
                 // 还未写入首条 record 时视为进行中；仅在显式失败（fallbackMsg）时标记失败
-                'status'  => $isFailed ? 0 : 1,
-                'percent' => 0,
-                'step'    => 0,
-                'memo'    => $fallbackMsg ?: yii::t('walle', 'deploy failed'),
-                'command' => '',
+                'status'      => $isFailed ? 0 : 1,
+                'percent'     => 0,
+                'step'        => 0,
+                'task_status' => $taskStatus,
+                'memo'        => $fallbackMsg ?: yii::t('walle', 'deploy failed'),
+                'command'     => '',
             ];
         }
 
         $memo = Record::normalizeMemo($record['memo']);
         $recordStatus = (int)$record['status'];
+        $action = (int)$record['action'];
+        $deployPhase = Record::getDeployPhase($action);
         $shellExit = Record::extractShellExitCode($memo);
         if ($recordStatus === 0 && $shellExit === 0) {
             LogHelper::deployDecision('get_process_status_corrected', [
@@ -500,14 +516,17 @@ class WalleController extends Controller {
             ]);
             $recordStatus = 1;
         }
-        // 部署进行中（start-deploy 尚未结束）时，避免轮询把「已成功但 record 未修正」误判为失败
-        if ($taskStatus === TaskModel::STATUS_PASS && $recordStatus === 0) {
-            LogHelper::deployDecision('get_process_in_progress', [
-                'reason' => 'task still PASS while latest record.status=0, treat as in progress',
-                'task_id' => $this->task->id,
-                'shell_exit' => $shellExit,
-                'record_action' => $record['action'] ?? null,
-            ]);
+        // start-deploy 未结束前 task 恒为 PASS：pre_release/post_release 可能在「同步」之后才执行，不得按 SYNC 等中间 record 判失败
+        if ($taskStatus === TaskModel::STATUS_PASS) {
+            if ($recordStatus === 0) {
+                LogHelper::deployDecision('get_process_in_progress', [
+                    'reason' => 'task PASS: deploy pipeline not finished (pre_release/post_release may be pending)',
+                    'task_id' => $this->task->id,
+                    'shell_exit' => $shellExit,
+                    'record_action' => $action,
+                    'deploy_phase' => Record::getDeployPhase($action),
+                ]);
+            }
             $recordStatus = 1;
         }
         if ($fallbackMsg !== '' && $recordStatus === 1) {
@@ -517,7 +536,6 @@ class WalleController extends Controller {
             $record['command'] = '';
         }
 
-        $action = (int)$record['action'];
         if ($recordStatus === 0) {
             LogHelper::deployDecision('get_process_return_failed', [
                 'reason' => $fallbackMsg !== '' ? 'fallbackMsg set' : 'record.status=0',
@@ -525,6 +543,7 @@ class WalleController extends Controller {
                 'task_status' => $taskStatus,
                 'record_id' => $record['id'] ?? null,
                 'record_action' => $action,
+                'deploy_phase' => $deployPhase,
                 'shell_exit' => $shellExit,
                 'fallback_msg' => $fallbackMsg,
                 'command' => stripslashes((string)$record['command']),
@@ -532,11 +551,13 @@ class WalleController extends Controller {
             ]);
         }
         return [
-            'status'  => $recordStatus,
-            'percent' => $action,
-            'step'    => Record::actionToStep($action),
-            'memo'    => $memo,
-            'command' => stripslashes((string)$record['command']),
+            'status'       => $recordStatus,
+            'percent'      => $action,
+            'step'         => Record::actionToStep($action),
+            'task_status'  => $taskStatus,
+            'deploy_phase' => $deployPhase,
+            'memo'         => $memo,
+            'command'      => stripslashes((string)$record['command']),
         ];
     }
 
