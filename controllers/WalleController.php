@@ -48,6 +48,11 @@ class WalleController extends Controller {
      */
     protected $walleFolder;
 
+    /**
+     * 目标机已完成软链切换与 post_release（此时不应再标记整次发布失败）
+     */
+    protected $remoteServersUpdated = false;
+
     public $enableCsrfValidation = false;
 
     /**
@@ -73,6 +78,7 @@ class WalleController extends Controller {
         }
         // 清除历史记录
         Record::deleteAll(['task_id' => $this->task->id]);
+        $this->remoteServersUpdated = false;
         // 重新发起部署前先恢复到可执行态，避免轮询在首条 record 产生前误判为 FAILED
         if ($this->task->status == TaskModel::STATUS_FAILED) {
             $this->task->status = TaskModel::STATUS_PASS;
@@ -119,6 +125,25 @@ class WalleController extends Controller {
             $this->conf->version = $this->task->link_id;
             $this->conf->save();
         } catch (\Exception $e) {
+            // 目标机已更新（含 pm2 重启）时，收尾异常不应覆盖为发布失败
+            if ($this->remoteServersUpdated) {
+                if ($this->task->action == TaskModel::ACTION_ONLINE) {
+                    $this->task->ex_link_id = $this->conf->version;
+                }
+                if ($this->task->action == TaskModel::ACTION_ROLLBACK || $this->task->id == 1) {
+                    $this->task->enable_rollback = TaskModel::ROLLBACK_FALSE;
+                }
+                $this->task->status = TaskModel::STATUS_DONE;
+                $this->task->save(false);
+                $this->_enableRollBack();
+                $this->conf->version = $this->task->link_id;
+                $this->conf->save(false);
+                $this->renderJson([
+                    'warning' => $e->getMessage(),
+                ]);
+                return;
+            }
+
             $this->task->status = TaskModel::STATUS_FAILED;
             $this->task->save();
             // 清理本地部署空间
@@ -390,11 +415,21 @@ class WalleController extends Controller {
      * @return array
      */
     protected function buildDeployProcessPayload($fallbackMsg = '') {
-        $record = Record::find()
-            ->where(['task_id' => $this->task->id])
-            ->orderBy(['id' => SORT_DESC])
-            ->asArray()
-            ->one();
+        $record = null;
+        if ($fallbackMsg !== '') {
+            $record = Record::find()
+                ->where(['task_id' => $this->task->id, 'status' => 0])
+                ->orderBy(['id' => SORT_DESC])
+                ->asArray()
+                ->one();
+        }
+        if (!$record) {
+            $record = Record::find()
+                ->where(['task_id' => $this->task->id])
+                ->orderBy(['id' => SORT_DESC])
+                ->asArray()
+                ->one();
+        }
 
         if (!$record) {
             $isFailed = ($fallbackMsg !== '');
@@ -410,12 +445,17 @@ class WalleController extends Controller {
             ];
         }
 
+        $memo = Record::normalizeMemo($record['memo']);
+        if ($fallbackMsg !== '' && (int)$record['status'] === 1) {
+            $memo = $fallbackMsg . ($memo !== '' ? "\n\n---\n" . $memo : '');
+        }
+
         $action = (int)$record['action'];
         return [
-            'status'  => (int)$record['status'],
+            'status'  => $fallbackMsg !== '' && (int)$record['status'] === 1 ? 0 : (int)$record['status'],
             'percent' => $action,
             'step'    => Record::actionToStep($action),
-            'memo'    => Record::normalizeMemo($record['memo']),
+            'memo'    => $memo,
             'command' => stripslashes((string)$record['command']),
         ];
     }
@@ -578,6 +618,7 @@ class WalleController extends Controller {
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($this->walleTask, $this->task->id, Record::ACTION_UPDATE_REMOTE, $duration);
         if (!$ret) throw new \Exception(yii::t('walle', 'update servers error'));
+        $this->remoteServersUpdated = true;
         return true;
     }
 

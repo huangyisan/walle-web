@@ -115,6 +115,8 @@ use yii\helpers\Url;
                     clearInterval(timer);
                     showDeployError(o, o.data || {});
                     $this.removeClass('disabled');
+                } else if (o.data && o.data.warning) {
+                    $('.result-success p').append(' (' + escapeHtml(o.data.warning) + ')');
                 }
             }).fail(function(xhr) {
                 clearInterval(timer);
