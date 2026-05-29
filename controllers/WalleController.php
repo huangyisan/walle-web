@@ -14,6 +14,7 @@ use app\components\Command;
 use app\components\Controller;
 use app\components\Folder;
 use app\components\Git;
+use app\components\LogHelper;
 use app\components\Repo;
 use app\components\Task as WalleTask;
 use app\models\Project;
@@ -125,6 +126,11 @@ class WalleController extends Controller {
             $this->conf->version = $this->task->link_id;
             $this->conf->save();
         } catch (\Exception $e) {
+            $this->logDeployDecision('action_start_deploy_catch', $e->getMessage(), null, [
+                'exception_class' => get_class($e),
+                'remote_servers_updated' => $this->remoteServersUpdated,
+                'trace_head' => mb_substr($e->getTraceAsString(), 0, 2000, 'UTF-8'),
+            ]);
             // 目标机已更新（含 pm2 重启）时，收尾异常不应覆盖为发布失败
             if ($this->remoteServersUpdated) {
                 if ($this->task->action == TaskModel::ACTION_ONLINE) {
@@ -492,6 +498,35 @@ class WalleController extends Controller {
     }
 
     /**
+     * 记录部署失败判定点，方便排查“命令成功但页面失败”这类状态不一致问题。
+     *
+     * @param string       $stage
+     * @param string       $reason
+     * @param Command|null $commandObj
+     * @param array        $context
+     */
+    protected function logDeployDecision($stage, $reason, Command $commandObj = null, array $context = []) {
+        $payload = [
+            'stage'       => $stage,
+            'reason'      => $reason,
+            'task_id'     => $this->task ? $this->task->id : null,
+            'task_status' => $this->task ? (int)$this->task->status : null,
+            'project_id'  => $this->task ? (int)$this->task->project_id : null,
+            'context'     => $context,
+        ];
+
+        if ($commandObj) {
+            $payload['exe_status'] = $commandObj->getExeStatus();
+            $payload['command'] = $commandObj->getExeCommand();
+            $payload['log_tail'] = mb_substr($commandObj->getExeLog(), -4000, null, 'UTF-8');
+        }
+
+        $message = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        LogHelper::write('deploy-decision', $message);
+        Command::log('[deploy-decision] ' . $message);
+    }
+
+    /**
      * 产生一个上线版本
      */
     private function _makeVersion() {
@@ -518,7 +553,12 @@ class WalleController extends Controller {
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($this->walleFolder, $this->task->id, Record::ACTION_PERMSSION, $duration);
 
-        if (!$ret) throw new \Exception(yii::t('walle', 'init deployment workspace error'));
+        if (!$ret) {
+            $this->logDeployDecision('init_workspace', 'initRemoteVersion returned false', $this->walleFolder, [
+                'ret' => $ret,
+            ]);
+            throw new \Exception(yii::t('walle', 'init deployment workspace error'));
+        }
         return true;
     }
 
@@ -537,7 +577,12 @@ class WalleController extends Controller {
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($revision, $this->task->id, Record::ACTION_CLONE, $duration);
 
-        if (!$ret) throw new \Exception(yii::t('walle', 'update code error'));
+        if (!$ret) {
+            $this->logDeployDecision('revision_update', 'updateToVersion returned false', $revision, [
+                'ret' => $ret,
+            ]);
+            throw new \Exception(yii::t('walle', 'update code error'));
+        }
         return true;
     }
 
@@ -555,7 +600,12 @@ class WalleController extends Controller {
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($this->walleTask, $this->task->id, Record::ACTION_PRE_DEPLOY, $duration);
 
-        if (!$ret) throw new \Exception(yii::t('walle', 'pre deploy task error'));
+        if (!$ret) {
+            $this->logDeployDecision('pre_deploy', 'preDeploy returned false', $this->walleTask, [
+                'ret' => $ret,
+            ]);
+            throw new \Exception(yii::t('walle', 'pre deploy task error'));
+        }
         return true;
     }
 
@@ -574,7 +624,12 @@ class WalleController extends Controller {
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($this->walleTask, $this->task->id, Record::ACTION_POST_DEPLOY, $duration);
 
-        if (!$ret) throw new \Exception(yii::t('walle', 'post deploy task error'));
+        if (!$ret) {
+            $this->logDeployDecision('post_deploy', 'postDeploy returned false', $this->walleTask, [
+                'ret' => $ret,
+            ]);
+            throw new \Exception(yii::t('walle', 'post deploy task error'));
+        }
         return true;
     }
 
@@ -588,12 +643,22 @@ class WalleController extends Controller {
 
         $sTime = Command::getMs();
 
-        if (Project::getAnsibleStatus()) {
-            // ansible copy
-            $this->walleFolder->ansibleCopyFiles($this->conf, $this->task);
-        } else {
-            // 循环 scp
-            $this->walleFolder->scpCopyFiles($this->conf, $this->task);
+        try {
+            if (Project::getAnsibleStatus()) {
+                // ansible copy
+                $this->walleFolder->ansibleCopyFiles($this->conf, $this->task);
+            } else {
+                // 循环 scp
+                $this->walleFolder->scpCopyFiles($this->conf, $this->task);
+            }
+        } catch (\Exception $e) {
+            $duration = Command::getMs() - $sTime;
+            Record::saveRecord($this->walleFolder, $this->task->id, Record::ACTION_SYNC, $duration);
+            $this->logDeployDecision('transmission_exception', $e->getMessage(), $this->walleFolder, [
+                'exception_class' => get_class($e),
+                'ansible' => Project::getAnsibleStatus(),
+            ]);
+            throw $e;
         }
 
         // 记录执行时间
@@ -633,7 +698,14 @@ class WalleController extends Controller {
         // 记录执行时间
         $duration = Command::getMs() - $sTime;
         Record::saveRecord($this->walleTask, $this->task->id, Record::ACTION_UPDATE_REMOTE, $duration);
-        if (!$ret) throw new \Exception(yii::t('walle', 'update servers error'));
+        if (!$ret) {
+            $this->logDeployDecision('update_remote_servers', 'runRemoteTaskCommandPackage returned false', $this->walleTask, [
+                'ret' => $ret,
+                'commands' => $cmd,
+                'delay' => $delay,
+            ]);
+            throw new \Exception(yii::t('walle', 'update servers error'));
+        }
         $this->remoteServersUpdated = true;
         return true;
     }

@@ -176,6 +176,18 @@ class Command {
         $this->log .= '[exit code: ' . $status . ']';
 
         $this->log($this->log);
+        if ($this->status !== 1) {
+            $message = json_encode([
+                'reason' => 'shell exit code is not 0',
+                'exit_code' => $status,
+                'command' => $command,
+                'stdout_tail' => mb_substr((string)$stdout, -2000, null, 'UTF-8'),
+                'stderr_tail' => mb_substr((string)$stderr, -2000, null, 'UTF-8'),
+                'log_tail' => mb_substr($this->log, -3000, null, 'UTF-8'),
+            ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            LogHelper::write('deploy-decision', $message);
+            $this->log('[deploy-decision] ' . $message);
+        }
         $this->log('---------------------------------');
 
         return $this->status === 1;
