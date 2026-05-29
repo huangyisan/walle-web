@@ -24,10 +24,13 @@ class Command {
     protected $config;
 
     /**
-     * 命令运行结果：0 失败，1 成功
+     * 命令运行返回值：0失败，1成功
      * @var int
      */
     protected $status = 1;
+
+    /** @var bool post_deploy 等长任务需 proc_open 分通道捕获输出 */
+    protected $captureOutputViaProcOpen = false;
 
     protected $command = '';
 
@@ -49,6 +52,14 @@ class Command {
     }
 
     /**
+     * post_deploy / pre_deploy 等长任务开启 proc_open 分通道捕获
+     */
+    public function enableProcOpenCapture($enable = true) {
+        $this->captureOutputViaProcOpen = (bool)$enable;
+        return $this;
+    }
+
+    /**
      * 执行本地宿主机命令
      *
      * @param $command
@@ -59,11 +70,15 @@ class Command {
         $this->log('---------------------------------');
         $this->log('---- Executing: $ ' . $command);
 
-        $exitCode = 1;
+        if (!$this->captureOutputViaProcOpen) {
+            return $this->runLocalCommandViaExec($command);
+        }
+
+        $status = 1;
         $stdout = '';
         $stderr = '';
 
-        // 使用 proc_open 分别捕获 stdout/stderr，避免复杂命令输出丢失
+        // post_deploy 等长任务：proc_open 分别捕获 stdout/stderr
         if (function_exists('proc_open')) {
             $descriptorSpec = [
                 0 => ['pipe', 'r'],
@@ -84,65 +99,66 @@ class Command {
                     if (!feof($pipes[2])) {
                         $read[] = $pipes[2];
                     }
-                    if (!empty($read)) {
-                        $write = null;
-                        $except = null;
-                        @stream_select($read, $write, $except, 0, 200000);
-                        foreach ($read as $stream) {
-                            $chunk = fread($stream, 8192);
-                            if ($chunk === false || $chunk === '') {
-                                continue;
-                            }
-                            if ($stream === $pipes[1]) {
-                                $stdout .= $chunk;
-                            } else {
-                                $stderr .= $chunk;
-                            }
-                        }
-                    }
-
-                    $processStatus = proc_get_status($process);
-                    if (!$processStatus['running']) {
+                    if (empty($read)) {
                         break;
                     }
+                    $write = null;
+                    $except = null;
+                    $changed = @stream_select($read, $write, $except, 0, 200000);
+                    if ($changed === false) {
+                        break;
+                    }
+                    foreach ($read as $stream) {
+                        $chunk = stream_get_contents($stream);
+                        if ($chunk === false || $chunk === '') {
+                            continue;
+                        }
+                        if ($stream === $pipes[1]) {
+                            $stdout .= $chunk;
+                        } else {
+                            $stderr .= $chunk;
+                        }
+                    }
                 }
-
-                // 进程结束后再阻塞读尽 pipe；未读尽就 proc_close 会得到 -1 而非真实 exit code
-                stream_set_blocking($pipes[1], true);
-                stream_set_blocking($pipes[2], true);
-                $stdout .= (string)stream_get_contents($pipes[1]);
-                $stderr .= (string)stream_get_contents($pipes[2]);
-
-                $processStatus = proc_get_status($process);
 
                 fclose($pipes[1]);
                 fclose($pipes[2]);
-                $closedExit = proc_close($process);
-
-                // PHP 在 pipe 未排空时 proc_close 常返回 -1；进程已结束时以 proc_get_status 为准
-                if (!$processStatus['running'] && (int)$processStatus['exitcode'] !== -1) {
-                    $exitCode = (int)$processStatus['exitcode'];
-                } elseif ($closedExit !== -1) {
-                    $exitCode = $closedExit;
-                } else {
-                    $exitCode = 1;
-                }
+                $status = proc_close($process);
             } else {
-                // proc_open 不可用时，回退到 exec
-                $fallback = [];
-                exec($command . ' 2>&1', $fallback, $exitCode);
-                $stdout = implode(PHP_EOL, $fallback);
+                return $this->runLocalCommandViaExec($command);
             }
         } else {
-            $fallback = [];
-            exec($command . ' 2>&1', $fallback, $exitCode);
-            $stdout = implode(PHP_EOL, $fallback);
+            return $this->runLocalCommandViaExec($command);
         }
 
-        // 执行过的命令
+        return $this->finalizeCommandResult($command, $status, $stdout, $stderr);
+    }
+
+    /**
+     * ssh/scp/git/ansible 等短命令：exec 获取退出码最可靠（与 8314dd1 前行为一致）
+     *
+     * @param string $command
+     * @return bool
+     */
+    protected function runLocalCommandViaExec($command) {
+        $status = 1;
+        $output = [];
+        exec($command . ' 2>&1', $output, $status);
+        $log = implode(PHP_EOL, $output);
+
+        return $this->finalizeCommandResult($command, $status, $log, '');
+    }
+
+    /**
+     * @param string $command
+     * @param int    $status shell 退出码
+     * @param string $stdout
+     * @param string $stderr
+     * @return bool
+     */
+    protected function finalizeCommandResult($command, $status, $stdout, $stderr) {
         $this->command = $command;
-        // shell 退出码 0 表示成功
-        $this->status = ((int)$exitCode === 0) ? 1 : 0;
+        $this->status = ((int)$status === 0) ? 1 : 0;
 
         $parts = [];
         if (trim($stdout) !== '') {
@@ -153,12 +169,11 @@ class Command {
             $parts[] = rtrim($stderr);
         }
 
-        // 操作日志（含退出码，便于页面上定位 yarn/npm 等失败）
         $this->log = trim(implode(PHP_EOL, $parts));
         if ($this->log !== '') {
             $this->log .= PHP_EOL;
         }
-        $this->log .= '[exit code: ' . $exitCode . ']';
+        $this->log .= '[exit code: ' . $status . ']';
 
         $this->log($this->log);
         $this->log('---------------------------------');

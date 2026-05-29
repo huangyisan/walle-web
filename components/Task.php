@@ -66,7 +66,8 @@ class Task extends Ansible {
         }
 
         $command = '. /etc/profile && cd ' . escapeshellarg($workspace) . ' && ' . implode(' && ', $commandsRun);
-        $ret = $this->runLocalCommand($command);
+        $ret = $this->enableProcOpenCapture(true)->runLocalCommand($command);
+        $this->enableProcOpenCapture(false);
         // command 保持为用户配置的多行内容，便于在页面查看
         $this->setExecutionResult(implode("\n", $commandsRun), $this->getExeLog());
 
