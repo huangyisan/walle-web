@@ -93,6 +93,25 @@ class GlobalHelper {
     }
 
     /**
+     * 当前 PHP 进程用户
+     *
+     * @return string
+     */
+    public static function getProcessUser() {
+        $user = getenv('USER');
+        if ($user !== false && $user !== '') {
+            return $user;
+        }
+        if (function_exists('posix_getpwuid') && function_exists('posix_geteuid')) {
+            $info = posix_getpwuid(posix_geteuid());
+            if ($info && !empty($info['name'])) {
+                return $info['name'];
+            }
+        }
+        return 'www-data';
+    }
+
+    /**
      * 当前登录是否为管理员（已激活）
      *
      * @return bool

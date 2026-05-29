@@ -5,6 +5,8 @@
  *   cp config/local.php.dist config/local.php
  *
  * 也可用环境变量覆盖数据库（见下方 WALLE_DB_*）。
+ *
+ * git/ssh/rsync 以 PHP-FPM 进程用户执行，请在 php-fpm 池配置中指定具备 Deploy Key 的系统用户。
  */
 defined('YII_DEBUG') or define('YII_DEBUG', false);
 defined('YII_ENV') or define('YII_ENV', 'prod');

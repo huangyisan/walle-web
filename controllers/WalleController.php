@@ -15,6 +15,7 @@ use app\components\Controller;
 use app\components\Folder;
 use app\components\Git;
 use app\components\LogHelper;
+use app\components\GlobalHelper;
 use app\components\Repo;
 use app\components\Task as WalleTask;
 use app\models\Project;
@@ -203,7 +204,7 @@ class WalleController extends Controller {
             if (!$isWritable) {
                 $code  = -1;
                 $log[] = yii::t('walle', 'hosted server is not writable error', [
-                    'user' => getenv("USER"),
+                    'user' => GlobalHelper::getProcessUser(),
                     'path' => $project->deploy_from,
                 ]);
             }
@@ -213,7 +214,7 @@ class WalleController extends Controller {
             if (!$ret) {
                 $code  = -1;
                 $error = $project->repo_type == Project::REPO_GIT
-                    ? yii::t('walle', 'ssh-key to git', ['user' => getenv("USER")])
+                    ? yii::t('walle', 'ssh-key to git', ['user' => GlobalHelper::getProcessUser()])
                     : yii::t('walle', 'correct username passwd');
                 $log[] = yii::t('walle', 'hosted server ssh error', [
                     'error' => $error,
@@ -248,7 +249,7 @@ class WalleController extends Controller {
             if (!$ret) {
                 $code = -1;
                 $log[] = yii::t('walle', 'target server ssh error', [
-                    'local_user'  => getenv("USER"),
+                    'local_user'  => GlobalHelper::getProcessUser(),
                     'remote_user' => $project->release_user,
                     'path'        => $project->release_to,
                 ]);
