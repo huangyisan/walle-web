@@ -132,6 +132,11 @@ class WalleController extends Controller {
             // 记录当前线上版本（软链）回滚则是回滚的版本，上线为新版本
             $this->conf->version = $this->task->link_id;
             $this->conf->save();
+            LogHelper::deployDecision('deploy_complete', [
+                'task_id' => (int)$this->task->id,
+                'task_status' => TaskModel::STATUS_DONE,
+                'link_id' => $this->task->link_id,
+            ]);
         } catch (\Exception $e) {
             $this->logDeployDecision('action_start_deploy_catch', $e->getMessage(), null, [
                 'exception_class' => get_class($e),
@@ -414,6 +419,17 @@ class WalleController extends Controller {
             return;
         }
         $payload = $this->buildDeployProcessPayload();
+        if ((int)$payload['status'] === 0) {
+            LogHelper::deployDecision('get_process_poll_failed', [
+                'task_id' => (int)$this->task->id,
+                'task_status' => (int)$this->task->status,
+                'payload_status' => (int)$payload['status'],
+                'payload_percent' => (int)$payload['percent'],
+                'payload_step' => (int)$payload['step'],
+                'payload_command' => $payload['command'],
+                'payload_memo_tail' => mb_substr((string)$payload['memo'], -2000, null, 'UTF-8'),
+            ]);
+        }
         $msg = '';
         if ((int)$payload['status'] === 0 && (int)$payload['percent'] > 0) {
             $msg = Record::getActionLabel((int)$payload['percent']);
@@ -481,6 +497,16 @@ class WalleController extends Controller {
                 'record_id' => $record['id'] ?? null,
                 'record_action' => $record['action'] ?? null,
                 'command' => stripslashes((string)$record['command']),
+            ]);
+            $recordStatus = 1;
+        }
+        // 部署进行中（start-deploy 尚未结束）时，避免轮询把「已成功但 record 未修正」误判为失败
+        if ($taskStatus === TaskModel::STATUS_PASS && $recordStatus === 0) {
+            LogHelper::deployDecision('get_process_in_progress', [
+                'reason' => 'task still PASS while latest record.status=0, treat as in progress',
+                'task_id' => $this->task->id,
+                'shell_exit' => $shellExit,
+                'record_action' => $record['action'] ?? null,
             ]);
             $recordStatus = 1;
         }

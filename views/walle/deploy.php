@@ -113,32 +113,53 @@ use yii\helpers\Url;
             var deployFinished = false;
             function markDeploySuccess() {
                 deployFinished = true;
-                $('.progress-status').removeClass('progress-bar-striped').addClass('progress-bar-success');
+                $('.progress-status').removeClass('progress-bar-danger').removeClass('progress-bar-striped').addClass('progress-bar-success');
                 $('.progress-status').parent().removeClass('progress-striped');
+                $('.progress-status').attr('aria-valuenow', 100).width('100%');
                 $('.result-success').show();
                 $('.result-failed').hide();
                 $this.removeClass('disabled');
                 clearInterval(timer);
             }
-            function handleDeployRequestError(o) {
+            function applyProcessUi(data) {
+                data = data || {};
+                if (0 != data.percent) {
+                    $('.progress-status').attr('aria-valuenow', data.percent).width(data.percent + '%');
+                }
+                for (var i = 1; i <= 6; i++) {
+                    $('.step-' + i).removeClass('text-green text-red progress-bar-striped');
+                    if (i <= data.step) {
+                        $('.step-' + i).removeClass('text-yellow').addClass('text-green');
+                    } else {
+                        $('.step-' + i).addClass('text-yellow');
+                    }
+                }
+            }
+            function isDeployDone(data) {
+                return data && 1 == data.status && (100 == data.percent || 6 == data.step);
+            }
+            function confirmDeployResult(o, dataOnFail) {
                 if (deployFinished) {
                     return;
                 }
-                // start-deploy 是长请求，可能在后端已完成后被网关/浏览器判失败；先以轮询状态为准。
                 $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id, function (process) {
                     var data = process.data || {};
-                    if (1 == data.status && 100 == data.percent) {
+                    applyProcessUi(data);
+                    if (isDeployDone(data)) {
                         markDeploySuccess();
                         return;
                     }
                     clearInterval(timer);
-                    showDeployError(o, o.data || data || {});
+                    showDeployError(o || process, dataOnFail || data || {});
                     $this.removeClass('disabled');
                 }).fail(function() {
                     clearInterval(timer);
-                    showDeployError(o, o.data || {});
+                    showDeployError(o || {msg: '<?= yii::t('walle', 'deploy failed') ?>'}, dataOnFail || {});
                     $this.removeClass('disabled');
                 });
+            }
+            function handleDeployRequestError(o) {
+                confirmDeployResult(o, o && o.data ? o.data : null);
             }
             $.post("<?= Url::to('@web/walle/start-deploy') ?>", {taskId: task_id}, function(o) {
                 if (deployFinished) {
@@ -146,9 +167,12 @@ use yii\helpers\Url;
                 }
                 if (o.code != 0) {
                     handleDeployRequestError(o);
-                } else if (o.data && o.data.warning) {
+                    return;
+                }
+                if (o.data && o.data.warning) {
                     $('.result-success p').append(' (' + escapeHtml(o.data.warning) + ')');
                 }
+                confirmDeployResult({msg: ''}, null);
             }).fail(function(xhr) {
                 var o = {msg: '<?= yii::t('walle', 'deploy failed') ?>'};
                 try {
@@ -159,29 +183,23 @@ use yii\helpers\Url;
             $('.progress-status').attr('aria-valuenow', 10).width('10%');
             $('.result-failed').hide();
             function getProcess() {
+                if (deployFinished) {
+                    return;
+                }
                 $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id, function (o) {
-                    data = o.data;
-                    // 执行失败
-                    if (0 == data.status) {
-                        clearInterval(timer);
-                        showDeployError(o, data);
-                        $this.removeClass('disabled');
-                        return;
-                    } else {
-                        $('.progress-status')
-                            .removeClass('progress-bar-danger progress-bar-striped')
-                            .addClass('progress-bar-success')
-                    }
-                    if (0 != data.percent) {
-                        $('.progress-status').attr('aria-valuenow', data.percent).width(data.percent + '%');
-                    }
-                    if (100 == data.percent) {
+                    var data = o.data || {};
+                    applyProcessUi(data);
+                    if (isDeployDone(data)) {
                         markDeploySuccess();
+                        return;
                     }
-                    for (var i = 1; i <= data.step; i++) {
-                        $('.step-' + i).removeClass('text-yellow text-red')
-                            .addClass('text-green progress-bar-striped')
+                    if (0 == data.status && data.percent > 0) {
+                        confirmDeployResult(o, data);
+                        return;
                     }
+                    $('.progress-status')
+                        .removeClass('progress-bar-danger')
+                        .addClass('progress-bar-success progress-bar-striped');
                 });
             }
             timer = setInterval(getProcess, 600);
