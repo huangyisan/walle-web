@@ -42,13 +42,14 @@ That's all. It's base package of PHP environment!
 
 Installation
 ------------
-## php8.2安装
+## php8.2以及需要的lib库安装
 ```shell
 apt -y install software-properties-common
 add-apt-repository ppa:ondrej/php
 apt update
 apt install php8.2 -y
 php -v
+apt install -y   php8.2-cli   php8.2-fpm   php8.2-mysql   php8.2-mbstring   php8.2-intl   php8.2-bcmath   php8.2-xml   php8.2-curl   php8.2-zip
 ```
 ## composer安装
 ```shell
