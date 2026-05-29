@@ -184,6 +184,12 @@ class Record extends \yii\db\ActiveRecord
         $command = $commandObj->getExeCommand();
         $output = $commandObj->getExeLog();
         $logFile = static::writeDeployLogFile($task_id, $command, $output);
+        $status = (int)$commandObj->getExeStatus();
+        if ($status === 0 && preg_match('/\[exit code:\s*0\]\s*$/', trim($output))) {
+            // 兼容 PHP proc_open/proc_close 在部分环境下误取退出码的情况：
+            // 日志明确显示 shell exit code 0 时，不应把 record 标成失败。
+            $status = 1;
+        }
 
         $memo = $output;
         if ($logFile) {
@@ -198,7 +204,7 @@ class Record extends \yii\db\ActiveRecord
         $record->attributes = [
             'user_id'    => \Yii::$app->user->id,
             'task_id'    => $task_id,
-            'status'     => (int)$commandObj->getExeStatus(),
+            'status'     => $status,
             'action'     => $action,
             'created_at' => time(),
             'command'    => $command,

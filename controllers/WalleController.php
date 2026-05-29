@@ -415,6 +415,7 @@ class WalleController extends Controller {
      * @return array
      */
     protected function buildDeployProcessPayload($fallbackMsg = '') {
+        $taskStatus = (int)$this->task->status;
         $record = null;
         if ($fallbackMsg !== '') {
             $record = Record::find()
@@ -431,28 +432,43 @@ class WalleController extends Controller {
                 ->one();
         }
 
+        if ($taskStatus === TaskModel::STATUS_DONE) {
+            return [
+                'status'  => 1,
+                'percent' => 100,
+                'step'    => 6,
+                'memo'    => $record ? Record::normalizeMemo($record['memo']) : '',
+                'command' => $record ? stripslashes((string)$record['command']) : '',
+            ];
+        }
+
         if (!$record) {
             $isFailed = ($fallbackMsg !== '');
-            $taskStatus = (int)$this->task->status;
-            $isDone = ($taskStatus === TaskModel::STATUS_DONE);
+            if ($taskStatus === TaskModel::STATUS_FAILED) {
+                $isFailed = true;
+            }
             return [
                 // 还未写入首条 record 时视为进行中；仅在显式失败（fallbackMsg）时标记失败
                 'status'  => $isFailed ? 0 : 1,
-                'percent' => $isDone ? 100 : 0,
-                'step'    => $isDone ? 6 : 0,
-                'memo'    => $fallbackMsg,
+                'percent' => 0,
+                'step'    => 0,
+                'memo'    => $fallbackMsg ?: yii::t('walle', 'deploy failed'),
                 'command' => '',
             ];
         }
 
         $memo = Record::normalizeMemo($record['memo']);
-        if ($fallbackMsg !== '' && (int)$record['status'] === 1) {
-            $memo = $fallbackMsg . ($memo !== '' ? "\n\n---\n" . $memo : '');
+        $recordStatus = (int)$record['status'];
+        if (($fallbackMsg !== '' || $taskStatus === TaskModel::STATUS_FAILED) && $recordStatus === 1) {
+            // 异常发生在某条成功 record 之后时，不要把成功命令展示成失败原因。
+            $memo = $fallbackMsg ?: yii::t('walle', 'deploy failed');
+            $recordStatus = 0;
+            $record['command'] = '';
         }
 
         $action = (int)$record['action'];
         return [
-            'status'  => $fallbackMsg !== '' && (int)$record['status'] === 1 ? 0 : (int)$record['status'],
+            'status'  => $recordStatus,
             'percent' => $action,
             'step'    => Record::actionToStep($action),
             'memo'    => $memo,
