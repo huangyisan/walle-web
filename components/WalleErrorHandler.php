@@ -7,7 +7,7 @@ use yii\web\HttpException;
 
 class WalleErrorHandler extends \yii\web\ErrorHandler {
 
-    protected function logException($exception) {
+    public function logException($exception) {
         parent::logException($exception);
 
         if ($exception instanceof HttpException && $exception->statusCode === 404) {
