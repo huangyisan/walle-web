@@ -80,6 +80,12 @@ class WalleController extends Controller {
         // 清除历史记录
         Record::deleteAll(['task_id' => $this->task->id]);
         $this->remoteServersUpdated = false;
+        LogHelper::deployDecision('deploy_start', [
+            'deploy_log_version' => 'v3',
+            'task_id' => (int)$this->task->id,
+            'project_id' => (int)$this->task->project_id,
+            'task_status' => (int)$this->task->status,
+        ]);
         // 重新发起部署前先恢复到可执行态，避免轮询在首条 record 产生前误判为 FAILED
         if ($this->task->status == TaskModel::STATUS_FAILED) {
             $this->task->status = TaskModel::STATUS_PASS;

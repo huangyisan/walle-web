@@ -258,18 +258,65 @@ class Command {
     }
 
     public static function log($message) {
-        if (empty(\Yii::$app->params['log.dir'])) return;
+        self::appendLogLine(
+            'walle-' . date('Ymd') . '.log',
+            date('Y-m-d H:i:s') . ' -- ' . $message . PHP_EOL
+        );
+    }
 
-        $logDir = \Yii::$app->params['log.dir'];
-        if (!file_exists($logDir)) return;
-
-        $logFile = realpath($logDir) . '/walle-' . date('Ymd') . '.log';
-        if (self::$logFile === null) {
-            self::$logFile = fopen($logFile, 'a');
+    /**
+     * @return string|null
+     */
+    public static function getLogDir() {
+        if (!class_exists('\Yii') || !\Yii::$app || empty(\Yii::$app->params['log.dir'])) {
+            $fromEnv = getenv('WALLE_LOG_PATH');
+            if ($fromEnv !== false && $fromEnv !== '') {
+                $logDir = rtrim($fromEnv, '/');
+            } else {
+                return null;
+            }
+        } else {
+            $logDir = rtrim(\Yii::$app->params['log.dir'], '/');
         }
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0755, true);
+        }
+        if (!is_dir($logDir)) {
+            return null;
+        }
+        $real = realpath($logDir);
+        return $real ?: $logDir;
+    }
 
-        $message = date('Y-m-d H:i:s -- ') . $message;
-        fwrite(self::$logFile, $message . PHP_EOL);
+    /**
+     * @param string $basename
+     * @param string $line
+     * @return bool
+     */
+    public static function appendLogLine($basename, $line) {
+        $logDir = self::getLogDir();
+        if (!$logDir) {
+            return false;
+        }
+        return @file_put_contents($logDir . '/' . $basename, $line, FILE_APPEND | LOCK_EX) !== false;
+    }
+
+    /**
+     * 部署判定诊断：写入 walle-*.log 与 deploy-decision-*.log（与命令日志同目录）
+     *
+     * @param string $stage
+     * @param array  $payload
+     */
+    public static function deployDecision($stage, array $payload = []) {
+        $payload['stage'] = $stage;
+        $line = date('Y-m-d H:i:s') . ' -- [deploy-decision] '
+            . json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+        $date = date('Ymd');
+        $ok1 = self::appendLogLine('walle-' . $date . '.log', $line);
+        $ok2 = self::appendLogLine('deploy-decision-' . $date . '.log', $line);
+        if (!$ok1 && !$ok2) {
+            error_log('walle deploy-decision: ' . trim($line));
+        }
     }
 
     /**

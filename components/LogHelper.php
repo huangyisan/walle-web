@@ -70,10 +70,7 @@ class LogHelper {
      * @param array  $payload
      */
     public static function deployDecision($stage, array $payload = []) {
-        $payload['stage'] = $stage;
-        $message = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-        self::write('deploy-decision', $message);
-        Command::log('[deploy-decision] ' . $message);
+        Command::deployDecision($stage, $payload);
     }
 
     /**
