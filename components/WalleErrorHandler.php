@@ -34,7 +34,11 @@ class WalleErrorHandler extends \yii\web\ErrorHandler {
             $exception->getTraceAsString()
         );
 
-        LogHelper::write('error', $message);
+        try {
+            LogHelper::write('error', $message);
+        } catch (\Throwable $e) {
+            // ignore
+        }
     }
 
 }

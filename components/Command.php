@@ -150,6 +150,10 @@ class Command {
         $this->log('---------------------------------');
 
         return $this->status === 1;
+    }
+
+    /**
+     * 执行远程目标机器命令
      *
      * @param string  $command
      * @param integer $delay 每台机器延迟执行post_release任务间隔, 不推荐使用, 仅当业务无法平滑重启时使用

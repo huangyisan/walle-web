@@ -27,33 +27,37 @@ class RequestLogBootstrap implements BootstrapInterface {
     }
 
     private function logRequest() {
-        if (empty(Yii::$app->params['log.dir'])) {
-            return;
+        try {
+            if (empty(Yii::$app->params['log.dir'])) {
+                return;
+            }
+
+            $request = Yii::$app->request;
+            $response = Yii::$app->response;
+            $duration = $this->startTime > 0
+                ? (int)round((microtime(true) - $this->startTime) * 1000)
+                : 0;
+            $userId = !Yii::$app->user->isGuest ? Yii::$app->user->id : '-';
+
+            $query = LogHelper::sanitizeParams($request->get());
+            $body = LogHelper::sanitizeParams($request->post());
+
+            $line = sprintf(
+                '%s %s | user=%s | ip=%s | status=%s | %dms | query=%s | post=%s',
+                $request->method,
+                $request->url,
+                $userId,
+                $request->userIP,
+                $response->statusCode,
+                $duration,
+                json_encode($query, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+            );
+
+            LogHelper::write('request', $line);
+        } catch (\Throwable $e) {
+            // 请求日志失败不能影响业务
         }
-
-        $request = Yii::$app->request;
-        $response = Yii::$app->response;
-        $duration = $this->startTime > 0
-            ? (int)round((microtime(true) - $this->startTime) * 1000)
-            : 0;
-        $userId = !Yii::$app->user->isGuest ? Yii::$app->user->id : '-';
-
-        $query = LogHelper::sanitizeParams($request->get());
-        $body = LogHelper::sanitizeParams($request->post());
-
-        $line = sprintf(
-            '%s %s | user=%s | ip=%s | status=%s | %dms | query=%s | post=%s',
-            $request->method,
-            $request->url,
-            $userId,
-            $request->userIP,
-            $response->statusCode,
-            $duration,
-            json_encode($query, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-            json_encode($body, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-        );
-
-        LogHelper::write('request', $line);
     }
 
 }

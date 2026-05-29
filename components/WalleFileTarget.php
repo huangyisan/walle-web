@@ -2,6 +2,8 @@
 
 namespace app\components;
 
+use Yii;
+
 class WalleFileTarget extends \yii\log\FileTarget {
 
     /** @var string 日志文件名前缀，如 error / warning / app */
@@ -14,7 +16,13 @@ class WalleFileTarget extends \yii\log\FileTarget {
         if ($this->logVars === null) {
             $this->logVars = ['_GET', '_POST', '_SERVER.REQUEST_URI', '_SERVER.REQUEST_METHOD', '_SERVER.REMOTE_ADDR'];
         }
-        parent::init();
+        try {
+            parent::init();
+        } catch (\Throwable $e) {
+            // log.dir 不可写时回退 runtime，避免整站 500
+            $this->logFile = Yii::getAlias('@runtime/logs/' . $this->channel . '.log');
+            parent::init();
+        }
     }
 
 }

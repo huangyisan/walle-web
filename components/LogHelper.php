@@ -6,19 +6,40 @@ use Yii;
 
 class LogHelper {
 
+    /** @var string|null */
+    private static $resolvedDir;
+
     /**
-     * @return string 日志目录（末尾带 /）
+     * @return string 日志目录（末尾带 /），不可写时回退到 runtime/logs
      */
     public static function dir() {
-        $dir = '/var/log/walle/';
+        if (self::$resolvedDir !== null) {
+            return self::$resolvedDir;
+        }
+
+        $candidates = [];
         if (Yii::$app && !empty(Yii::$app->params['log.dir'])) {
-            $dir = Yii::$app->params['log.dir'];
+            $candidates[] = Yii::$app->params['log.dir'];
         }
-        $dir = rtrim($dir, '/') . '/';
-        if (!is_dir($dir)) {
-            @mkdir($dir, 0755, true);
+        $candidates[] = '/var/log/walle/';
+        $candidates[] = Yii::getAlias('@runtime/logs');
+
+        foreach ($candidates as $dir) {
+            $dir = rtrim($dir, '/') . '/';
+            if (!is_dir($dir)) {
+                @mkdir($dir, 0755, true);
+            }
+            if (is_dir($dir) && is_writable($dir)) {
+                self::$resolvedDir = (realpath($dir) ?: $dir);
+                if (substr(self::$resolvedDir, -1) !== '/') {
+                    self::$resolvedDir .= '/';
+                }
+                return self::$resolvedDir;
+            }
         }
-        return (realpath($dir) ?: $dir);
+
+        self::$resolvedDir = Yii::getAlias('@runtime/logs/');
+        return self::$resolvedDir;
     }
 
     /**
@@ -34,8 +55,12 @@ class LogHelper {
      * @param string $message
      */
     public static function write($channel, $message) {
-        $line = date('Y-m-d H:i:s') . ' -- ' . $message . PHP_EOL;
-        @file_put_contents(self::filePath($channel), $line, FILE_APPEND | LOCK_EX);
+        try {
+            $line = date('Y-m-d H:i:s') . ' -- ' . $message . PHP_EOL;
+            @file_put_contents(self::filePath($channel), $line, FILE_APPEND | LOCK_EX);
+        } catch (\Throwable $e) {
+            // 日志写入失败不能影响业务请求
+        }
     }
 
     /**
