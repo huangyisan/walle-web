@@ -9,6 +9,7 @@ return [
     'error todo' => 'See output below; if log.dir is configured, full logs are also written as deploy-task-*.log on the server',
     'full log file' => 'Full log file: {path}',
     'log truncated' => '(output truncated, showing tail)',
+    'internal error hint' => 'Internal server error. See log file: {path}',
     'deploy step unknown' => 'Unknown step',
     'deploy failed' => 'Deployment failed',
     'error title' => 'deploy error:（',

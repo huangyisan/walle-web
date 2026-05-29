@@ -17,7 +17,8 @@ $config = [
             'sessionTable' => 'session',
         ],
         'errorHandler' => [
-            'errorAction' => 'site/error',
+            'class'         => \app\components\WalleErrorHandler::class,
+            'errorAction'   => 'site/error',
         ],
         'mail' => [
             'class'            => \yii\symfonymailer\Mailer::class,
@@ -30,8 +31,17 @@ $config = [
             'traceLevel' => YII_DEBUG ? 3 : 0,
             'targets'    => [
                 [
-                    'class'  => 'yii\log\FileTarget',
-                    'levels' => ['error', 'warning'],
+                    'class'   => \app\components\WalleFileTarget::class,
+                    'channel' => 'error',
+                    'levels'  => ['error'],
+                    'except'  => [
+                        'yii\web\HttpException:404',
+                    ],
+                ],
+                [
+                    'class'   => \app\components\WalleFileTarget::class,
+                    'channel' => 'warning',
+                    'levels'  => ['warning'],
                 ],
             ],
         ],
@@ -57,6 +67,7 @@ $config = [
     ],
     'bootstrap'  => [
         'app\components\EventBootstrap',
+        'app\components\RequestLogBootstrap',
         'log',
     ],
     'params'     => require(__DIR__ . '/params.php'),

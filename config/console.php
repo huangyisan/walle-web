@@ -15,8 +15,14 @@ return [
         'log'     => [
             'targets' => [
                 [
-                    'class'  => 'yii\log\FileTarget',
-                    'levels' => ['error', 'warning'],
+                    'class'   => \app\components\WalleFileTarget::class,
+                    'channel' => 'error',
+                    'levels'  => ['error'],
+                ],
+                [
+                    'class'   => \app\components\WalleFileTarget::class,
+                    'channel' => 'warning',
+                    'levels'  => ['warning'],
                 ],
             ],
         ],

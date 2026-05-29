@@ -9,6 +9,7 @@ return [
     'error todo' => '完整日志见下方输出；若配置了 log.dir，还会在服务器日志目录生成 deploy-task-*.log 文件',
     'full log file' => '完整日志文件：{path}',
     'log truncated' => '（输出过长，以下为末尾片段）',
+    'internal error hint' => '服务器内部错误，详情请查看日志：{path}',
     'deploy step unknown' => '未知步骤',
     'deploy failed' => '部署失败',
     'error title' => '上线出错:（',

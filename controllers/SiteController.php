@@ -161,10 +161,15 @@ class SiteController extends Controller
             $name .= " (#$code)";
         }
 
-        if ($exception instanceof \Exception) {
+        if ($exception instanceof \Throwable) {
             $message = $exception->getMessage();
         } else {
             $message = Yii::t('yii', 'An internal server error occurred.');
+        }
+
+        if (!YII_DEBUG && !($exception instanceof HttpException)) {
+            $logFile = \app\components\LogHelper::filePath('error');
+            $message = Yii::t('walle', 'internal error hint', ['path' => $logFile]);
         }
 
         if (Yii::$app->getRequest()->getIsAjax()) {

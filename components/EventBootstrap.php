@@ -30,6 +30,12 @@ class EventBootstrap implements BootstrapInterface
                 Yii::$app->end();
             }
             $event->isValid = false;
+            \app\components\LogHelper::write('error', sprintf(
+                'Auth required: %s/%s ip=%s',
+                $cid,
+                $aid,
+                Yii::$app->request->userIP
+            ));
             throw new \Exception(yii::t('w', 'need login'));
         });
     }
