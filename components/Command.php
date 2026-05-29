@@ -77,20 +77,27 @@ class Command {
                 stream_set_blocking($pipes[2], false);
 
                 while (true) {
-                    $read = [$pipes[1], $pipes[2]];
-                    $write = null;
-                    $except = null;
-                    @stream_select($read, $write, $except, 0, 200000);
-
-                    foreach ($read as $stream) {
-                        $chunk = stream_get_contents($stream);
-                        if ($chunk === false || $chunk === '') {
-                            continue;
-                        }
-                        if ($stream === $pipes[1]) {
-                            $stdout .= $chunk;
-                        } else {
-                            $stderr .= $chunk;
+                    $read = [];
+                    if (!feof($pipes[1])) {
+                        $read[] = $pipes[1];
+                    }
+                    if (!feof($pipes[2])) {
+                        $read[] = $pipes[2];
+                    }
+                    if (!empty($read)) {
+                        $write = null;
+                        $except = null;
+                        @stream_select($read, $write, $except, 0, 200000);
+                        foreach ($read as $stream) {
+                            $chunk = fread($stream, 8192);
+                            if ($chunk === false || $chunk === '') {
+                                continue;
+                            }
+                            if ($stream === $pipes[1]) {
+                                $stdout .= $chunk;
+                            } else {
+                                $stderr .= $chunk;
+                            }
                         }
                     }
 
@@ -100,19 +107,26 @@ class Command {
                     }
                 }
 
-                // 进程退出后再读一次，避免 PM2/Prisma 等尾部输出落在 pipe 里未捕获
-                $tailOut = stream_get_contents($pipes[1]);
-                if ($tailOut !== false && $tailOut !== '') {
-                    $stdout .= $tailOut;
-                }
-                $tailErr = stream_get_contents($pipes[2]);
-                if ($tailErr !== false && $tailErr !== '') {
-                    $stderr .= $tailErr;
-                }
+                // 进程结束后再阻塞读尽 pipe；未读尽就 proc_close 会得到 -1 而非真实 exit code
+                stream_set_blocking($pipes[1], true);
+                stream_set_blocking($pipes[2], true);
+                $stdout .= (string)stream_get_contents($pipes[1]);
+                $stderr .= (string)stream_get_contents($pipes[2]);
+
+                $processStatus = proc_get_status($process);
 
                 fclose($pipes[1]);
                 fclose($pipes[2]);
-                $exitCode = proc_close($process);
+                $closedExit = proc_close($process);
+
+                // PHP 在 pipe 未排空时 proc_close 常返回 -1；进程已结束时以 proc_get_status 为准
+                if (!$processStatus['running'] && (int)$processStatus['exitcode'] !== -1) {
+                    $exitCode = (int)$processStatus['exitcode'];
+                } elseif ($closedExit !== -1) {
+                    $exitCode = $closedExit;
+                } else {
+                    $exitCode = 1;
+                }
             } else {
                 // proc_open 不可用时，回退到 exec
                 $fallback = [];
