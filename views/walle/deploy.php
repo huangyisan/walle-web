@@ -110,22 +110,51 @@ use yii\helpers\Url;
             $this.addClass('disabled');
             var task_id = $(this).data('id');
             var timer;
-            $.post("<?= Url::to('@web/walle/start-deploy') ?>", {taskId: task_id}, function(o) {
-                if (o.code != 0) {
+            var deployFinished = false;
+            function markDeploySuccess() {
+                deployFinished = true;
+                $('.progress-status').removeClass('progress-bar-striped').addClass('progress-bar-success');
+                $('.progress-status').parent().removeClass('progress-striped');
+                $('.result-success').show();
+                $('.result-failed').hide();
+                $this.removeClass('disabled');
+                clearInterval(timer);
+            }
+            function handleDeployRequestError(o) {
+                if (deployFinished) {
+                    return;
+                }
+                // start-deploy 是长请求，可能在后端已完成后被网关/浏览器判失败；先以轮询状态为准。
+                $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id, function (process) {
+                    var data = process.data || {};
+                    if (1 == data.status && 100 == data.percent) {
+                        markDeploySuccess();
+                        return;
+                    }
+                    clearInterval(timer);
+                    showDeployError(o, o.data || data || {});
+                    $this.removeClass('disabled');
+                }).fail(function() {
                     clearInterval(timer);
                     showDeployError(o, o.data || {});
                     $this.removeClass('disabled');
+                });
+            }
+            $.post("<?= Url::to('@web/walle/start-deploy') ?>", {taskId: task_id}, function(o) {
+                if (deployFinished) {
+                    return;
+                }
+                if (o.code != 0) {
+                    handleDeployRequestError(o);
                 } else if (o.data && o.data.warning) {
                     $('.result-success p').append(' (' + escapeHtml(o.data.warning) + ')');
                 }
             }).fail(function(xhr) {
-                clearInterval(timer);
                 var o = {msg: '<?= yii::t('walle', 'deploy failed') ?>'};
                 try {
                     o = JSON.parse(xhr.responseText);
                 } catch (e) {}
-                showDeployError(o, o.data || {});
-                $this.removeClass('disabled');
+                handleDeployRequestError(o);
             });
             $('.progress-status').attr('aria-valuenow', 10).width('10%');
             $('.result-failed').hide();
@@ -147,10 +176,7 @@ use yii\helpers\Url;
                         $('.progress-status').attr('aria-valuenow', data.percent).width(data.percent + '%');
                     }
                     if (100 == data.percent) {
-                        $('.progress-status').removeClass('progress-bar-striped').addClass('progress-bar-success');
-                        $('.progress-status').parent().removeClass('progress-striped');
-                        $('.result-success').show();
-                        clearInterval(timer)
+                        markDeploySuccess();
                     }
                     for (var i = 1; i <= data.step; i++) {
                         $('.step-' + i).removeClass('text-yellow text-red')
