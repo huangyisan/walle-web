@@ -42,7 +42,14 @@ That's all. It's base package of PHP environment!
 
 Installation
 ------------
-
+## php8.2安装
+```shell
+apt -y install software-properties-common
+add-apt-repository ppa:ondrej/php
+apt update
+apt install php8.2 -y
+php -v
+```
 ## composer安装
 ```shell
 php8.2 -v   # 先确认 8.2 可用
