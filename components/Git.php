@@ -144,9 +144,9 @@ class Git extends Command {
     public function getBranchList() {
         $destination = Project::getDeployFromDir();
         // 应该先更新，不然在remote git删除当前选中的分支后，获取分支列表会失败
+        // updateRepo 内部已执行 fetch --all + reset --hard，这里无需再 pull -a 重复拉取一次
         $this->updateRepo(null, $destination);
         $cmd[] = sprintf('cd %s ', $destination);
-        $cmd[] = '/usr/bin/env git pull -a';
         $cmd[] = '/usr/bin/env git branch -a';
         $command = join(' && ', $cmd);
         $result = $this->runLocalCommand($command);
