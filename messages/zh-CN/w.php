@@ -51,6 +51,7 @@ return [
     'dropdown profile' => '个人资料',
     'dropdown reset password' => '修改密码',
     'dropdown logout' => '退出',
+    'back to legacy walle' => '返回旧版walle',
     'menu config project' => '项目配置',
     'menu task list' => '我的上线单',
     'menu submit task' => '提交上线单',

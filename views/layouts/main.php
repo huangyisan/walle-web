@@ -75,6 +75,14 @@ $userName =  \Yii::$app->user->id ? $user->getName() : '';
 
         <div class="navbar-header pull-right" role="navigation">
             <ul class="nav ace-nav">
+                <?php if (!empty(\Yii::$app->params['legacy_walle_url'])) { ?>
+                <li class="light-blue">
+                    <a href="<?= Html::encode(\Yii::$app->params['legacy_walle_url']) ?>" target="_blank" rel="noopener">
+                        <i class="icon-undo"></i>
+                        <?= yii::t('w', 'back to legacy walle') ?>
+                    </a>
+                </li>
+                <?php } ?>
                 <?php if (GlobalHelper::isValidAdmin() && ($count = count(User::getInactiveAdminList()))) { ?>
                 <li class="light-blue">
                     <a data-toggle="dropdown" class="dropdown-toggle" href="#">

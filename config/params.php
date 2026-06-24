@@ -21,4 +21,7 @@ return [
     'mail-suffix' => [
         '*', # 支持多个
     ],
+
+    // *******旧版walle地址，配置后顶栏会出现"返回旧版walle"按钮，留空则不显示*******
+    'legacy_walle_url' => isset($_ENV['WALLE_LEGACY_URL']) ? $_ENV['WALLE_LEGACY_URL'] : '',
 ];

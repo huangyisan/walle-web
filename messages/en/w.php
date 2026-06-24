@@ -51,6 +51,7 @@ return [
     'dropdown profile' => 'Profile',
     'dropdown reset password' => 'Reset Password',
     'dropdown logout' => 'Logout',
+    'back to legacy walle' => 'Back to legacy Walle',
     'menu config project' => 'Project Configure',
     'menu task list' => 'Deployment List',
     'menu submit task' => 'Submit Deployment Bill',
