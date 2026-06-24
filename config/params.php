@@ -24,4 +24,7 @@ return [
 
     // *******旧版walle地址，配置后顶栏会出现"返回旧版walle"按钮，留空则不显示*******
     'legacy_walle_url' => isset($_ENV['WALLE_LEGACY_URL']) ? $_ENV['WALLE_LEGACY_URL'] : '',
+
+    // *******是否开放自助注册，关闭后注册页不可用、登录页不再显示注册入口，需管理员在用户管理里手动新增用户*******
+    'enable_signup' => isset($_ENV['WALLE_ENABLE_SIGNUP']) ? (bool)$_ENV['WALLE_ENABLE_SIGNUP'] : true,
 ];

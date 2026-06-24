@@ -66,6 +66,8 @@ return [
     'login password' => 'Password',
     'login forgot password' => 'Forgot password',
     'login register user' => 'Signup',
+    'signup closed title' => 'Registration is closed',
+    'signup closed desc' => 'Self-service signup is currently disabled. Please contact an administrator to create an account for you.',
 
     'login resend email' => 'Please confirm your email',
 

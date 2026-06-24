@@ -9,6 +9,8 @@ return [
     'level' => 'Level',
     'un-auth' => '(waiting for auth by other admin)',
     'inactive' => 'inactive',
+    'activate email' => 'Activate email',
+    'confirm activate email' => 'Activate this user\'s email directly without waiting for the confirmation email?',
     'active' => 'active',
     'register time' => 'Register Time',
     'js pass' => 'pass：）',

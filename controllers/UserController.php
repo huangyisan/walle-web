@@ -172,6 +172,26 @@ class UserController extends Controller {
     }
 
     /**
+     * 管理员直接激活用户邮箱，免去邮件确认环节；邮件激活流程本身保留不变
+     *
+     * @return  json
+     */
+    public function actionActivateEmail($uid) {
+        $this->validateAdmin();
+        $user = User::findOne($uid);
+        if (!$user) {
+            $this->renderJson([], self::FAIL, yii::t('user', 'user not exists'));
+            return;
+        }
+        if (!$user->removeEmailConfirmationToken(true)) {
+            $this->renderJson([], self::FAIL, yii::t('w', 'update failed'));
+            return;
+        }
+
+        $this->renderJson([], self::SUCCESS);
+    }
+
+    /**
      * 帐号冻结
      *
      * @return  json

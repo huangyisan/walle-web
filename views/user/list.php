@@ -72,8 +72,12 @@ use app\models\User;
                                         data-status-url="<?= $row['status'] == User::STATUS_INVALID ? Url::to('@web/user/un-ban') : Url::to('@web/user/ban') ?>"
                                         data-role-url="<?= $row['role'] == User::ROLE_ADMIN ? Url::to('@web/user/to-dev') : Url::to('@web/user/to-admin') ?>"
                                         data-delete-url="<?= Url::to('@web/user/delete') ?>"
+                                        data-activate-email-url="<?= Url::to('@web/user/activate-email') ?>"
                                         >
                                         <li><a href="###" data-toggle="modal" data-target="#update-real-name" ><i class="icon-pencil"></i> <?= yii::t('w', 'edit') ?></a></li>
+                                        <?php if ($row['is_email_verified'] == User::MAIL_INACTIVE) { ?>
+                                        <li><a href="###" class="cnt-user-option" data-url-key="activate-email-url" data-confirm="<?= yii::t('user', 'confirm activate email') ?>"><i class="icon-envelope-alt"></i> <?= yii::t('user', 'activate email') ?></a></li>
+                                        <?php } ?>
                                         <li><a href="###" class="cnt-user-option" data-url-key="status-url" data-confirm="<?= yii::t('user', 'label status to opposite ' . $row['status']) ?>"><i class="<?= $row['status'] == User::STATUS_INVALID ? 'icon-ok-circle' : 'icon-ban-circle' ?>"></i> <?= yii::t('user', 'status to opposite ' . $row['status']) ?> </a></li>
                                         <li><a href="###" class="cnt-user-option" data-url-key="delete-url" data-confirm="<?= yii::t('user', 'js delete user') ?>"><i class="icon-trash"></i> <?= yii::t('w', 'delete') ?></a></li>
                                         <li class="divider"></li>

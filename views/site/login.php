@@ -42,12 +42,14 @@ $this->params['breadcrumbs'][] = $this->title;
                 </a>
             </div>
 
+            <?php if (!empty(\Yii::$app->params['enable_signup'])) { ?>
             <div>
                 <a href="<?= Url::to('@web/site/signup') ?>" class="user-signup-link">
                     <?= yii::t('w','login register user')?>
                     <i class="icon-arrow-right"></i>
                 </a>
             </div>
+            <?php } ?>
         </div>
 
     </div><!-- /widget-body -->

@@ -66,6 +66,8 @@ return [
     'login password' => '密码',
     'login forgot password' => '忘记密码',
     'login register user' => '注册账号',
+    'signup closed title' => '注册功能已关闭',
+    'signup closed desc' => '当前已关闭自助注册，请联系管理员为你创建账号。',
 
     'login resend email' => '请确认你的邮箱',
 

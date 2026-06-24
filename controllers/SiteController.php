@@ -58,6 +58,10 @@ class SiteController extends Controller
      * User signup
      */
     public function actionSignup() {
+        if (empty(Yii::$app->params['enable_signup'])) {
+            return $this->render('signupClosed');
+        }
+
         $user = new User(['scenario' => 'signup']);
         if ($user->load(Yii::$app->request->post())) {
             $user->status = User::STATUS_ACTIVE;

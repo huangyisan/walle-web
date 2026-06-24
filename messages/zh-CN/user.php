@@ -10,6 +10,8 @@ return [
     'role' => '角色',
     'un-auth' => '（等待其它管理员审核）',
     'inactive' => '未激活',
+    'activate email' => '激活邮箱',
+    'confirm activate email' => '确认直接激活该用户的邮箱（无需等待邮件确认）吗？',
     'register time' => '注册时间',
     'js pass' => '审核通过：）',
     'js pass failed' => '审核操作失败：）',
