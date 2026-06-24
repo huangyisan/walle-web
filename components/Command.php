@@ -195,7 +195,9 @@ class Command {
         if (!self::$hasTimeoutBin) {
             return $command;
         }
-        return sprintf('timeout -k 5 %d %s', self::MAX_EXEC_SECONDS, $command);
+        // $command 常是 "cd dir && git xxx && ..." 的复合命令，cd 是 shell 内置命令不是可执行文件，
+        // 必须整体丢进 sh -c 子shell 里再用 timeout 包裹，否则 timeout 会直接对 cd 报 127（command not found）
+        return sprintf('timeout -k 5 %d sh -c %s', self::MAX_EXEC_SECONDS, escapeshellarg($command));
     }
 
     /**

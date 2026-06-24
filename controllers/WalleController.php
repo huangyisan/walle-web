@@ -351,12 +351,16 @@ class WalleController extends Controller {
      * @param $projectId
      */
     public function actionGetBranch($projectId) {
-        $conf = Project::getConf($projectId);
+        try {
+            $conf = Project::getConf($projectId);
 
-        $version = Repo::getRevision($conf);
-        $list = $version->getBranchList();
+            $version = Repo::getRevision($conf);
+            $list = $version->getBranchList();
 
-        $this->renderJson($list);
+            $this->renderJson($list);
+        } catch (\Exception $e) {
+            $this->renderJson([], self::FAIL, $e->getMessage());
+        }
     }
 
     /**
@@ -365,21 +369,25 @@ class WalleController extends Controller {
      * @param $projectId
      */
     public function actionGetCommitHistory($projectId, $branch = '') {
-        $conf = Project::getConf($projectId);
-        $revision = Repo::getRevision($conf);
-        if ($conf->repo_mode == Project::REPO_MODE_TAG && $conf->repo_type == Project::REPO_GIT) {
-            $list = $revision->getTagList();
-        } else {
-            if ($branch === '' || $branch === null) {
-                if ($revision instanceof Git) {
-                    $branch = $revision->getDefaultBranch();
-                } else {
-                    $branch = 'trunk';
+        try {
+            $conf = Project::getConf($projectId);
+            $revision = Repo::getRevision($conf);
+            if ($conf->repo_mode == Project::REPO_MODE_TAG && $conf->repo_type == Project::REPO_GIT) {
+                $list = $revision->getTagList();
+            } else {
+                if ($branch === '' || $branch === null) {
+                    if ($revision instanceof Git) {
+                        $branch = $revision->getDefaultBranch();
+                    } else {
+                        $branch = 'trunk';
+                    }
                 }
+                $list = $revision->getCommitList($branch);
             }
-            $list = $revision->getCommitList($branch);
+            $this->renderJson($list);
+        } catch (\Exception $e) {
+            $this->renderJson([], self::FAIL, $e->getMessage());
         }
-        $this->renderJson($list);
     }
 
     /**
@@ -388,11 +396,15 @@ class WalleController extends Controller {
      * @param $projectId
      */
     public function actionGetCommitFile($projectId, $start, $end, $branch = 'trunk') {
-        $conf = Project::getConf($projectId);
-        $revision = Repo::getRevision($conf);
-        $list = $revision->getFileBetweenCommits($branch, $start, $end);
+        try {
+            $conf = Project::getConf($projectId);
+            $revision = Repo::getRevision($conf);
+            $list = $revision->getFileBetweenCommits($branch, $start, $end);
 
-        $this->renderJson($list);
+            $this->renderJson($list);
+        } catch (\Exception $e) {
+            $this->renderJson([], self::FAIL, $e->getMessage());
+        }
     }
 
     /**

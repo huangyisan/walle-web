@@ -147,6 +147,13 @@ use app\models\Task;
                     // 获取分支完成后, 一定条件重新获取提交列表
                     $('#branch').change();
                 }
+            }).fail(function(xhr) {
+                $('.get-branch').hide();
+                var msg = '';
+                try {
+                    msg = JSON.parse(xhr.responseText).msg;
+                } catch (e) {}
+                showError(msg || '获取分支列表失败');
             });
         }
 
@@ -165,6 +172,13 @@ use app\models\Task;
                 });
                 $('#task-commit_id').html(select);
                 $('.get-history').hide()
+            }).fail(function(xhr) {
+                $('.get-history').hide();
+                var msg = '';
+                try {
+                    msg = JSON.parse(xhr.responseText).msg;
+                } catch (e) {}
+                showError(msg || '获取commit记录失败');
             });
         }
 
