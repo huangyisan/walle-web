@@ -108,6 +108,18 @@ use yii\helpers\Url;
         $('.btn-deploy').click(function() {
             $this = $(this);
             $this.addClass('disabled');
+            // 重新发起部署：先把上一次失败遗留的红色进度条/步骤图标重置为进行中状态，
+            // 避免在第一次轮询结果回来之前，页面还顶着上一次失败的红色展示
+            $('.result-failed').hide();
+            $('.result-success').hide();
+            $('.progress-status')
+                .removeClass('progress-bar-danger')
+                .addClass('progress-bar-success progress-bar-striped')
+                .attr('aria-valuenow', 10).width('10%');
+            $('.progress-status').parent().addClass('progress-striped');
+            for (var si = 1; si <= 6; si++) {
+                $('.step-' + si).removeClass('text-green text-red').addClass('text-yellow');
+            }
             var task_id = $(this).data('id');
             var timer;
             var deployFinished = false;
@@ -210,8 +222,6 @@ use yii\helpers\Url;
                 } catch (e) {}
                 handleDeployRequestError(o);
             });
-            $('.progress-status').attr('aria-valuenow', 10).width('10%');
-            $('.result-failed').hide();
             function getProcess() {
                 if (deployFinished) {
                     return;
