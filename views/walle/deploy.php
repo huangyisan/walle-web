@@ -111,6 +111,9 @@ use yii\helpers\Url;
             var task_id = $(this).data('id');
             var timer;
             var deployFinished = false;
+            // 前端兜底：最长等待 10 分钟，不重试，超时直接判失败提示用户去看服务器/日志
+            var DEPLOY_MAX_WAIT_MS = 10 * 60 * 1000;
+            var deployStartedAt = Date.now();
             function markDeploySuccess() {
                 deployFinished = true;
                 $('.progress-status').removeClass('progress-bar-danger').removeClass('progress-bar-striped').addClass('progress-bar-success');
@@ -120,6 +123,16 @@ use yii\helpers\Url;
                 $('.result-failed').hide();
                 $this.removeClass('disabled');
                 clearInterval(timer);
+            }
+            function markDeployTimeout() {
+                if (deployFinished) {
+                    return;
+                }
+                deployFinished = true;
+                clearInterval(timer);
+                $('.progress-status').removeClass('progress-bar-success').addClass('progress-bar-danger');
+                showDeployError({msg: '<?= yii::t('walle', 'deploy timeout') ?>'}, {});
+                $this.removeClass('disabled');
             }
             function applyProcessUi(data) {
                 data = data || {};
@@ -198,6 +211,10 @@ use yii\helpers\Url;
             $('.result-failed').hide();
             function getProcess() {
                 if (deployFinished) {
+                    return;
+                }
+                if (Date.now() - deployStartedAt >= DEPLOY_MAX_WAIT_MS) {
+                    markDeployTimeout();
                     return;
                 }
                 $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id, function (o) {

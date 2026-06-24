@@ -6,6 +6,7 @@ return [
     'create task' => '创建上线单',
 
     'unknown project' => '未知的项目，请确认：）',
+    'project deleted' => '（项目已删除）',
     'you are not the member of project' => '非该项目成员，无权限',
     'unknown deployment bill' => '上线单号不存在：）',
     'can\'t delele the job which is done' => '不可以删除已上线成功的任务：）',

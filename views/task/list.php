@@ -48,7 +48,7 @@ use yii\helpers\Url;
                 <?php if ($audit) { ?>
                 <td><?= $item['user']['realname'] ?></td>
                 <?php } ?>
-                <td><?= $item['project']['name'] ?> - <?= \Yii::t('w', 'conf_level_' . $item['project']['level']) ?></td>
+                <td><?= $item['project'] ? $item['project']['name'] . ' - ' . \Yii::t('w', 'conf_level_' . $item['project']['level']) : \Yii::t('task', 'project deleted') ?></td>
                 <td><?= $item['title'] ?></td>
                 <td><?= $item['updated_at'] ?></td>
                 <td><?= $item['branch'] ?></td>

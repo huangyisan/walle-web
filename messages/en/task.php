@@ -6,6 +6,7 @@ return [
     'create task' => 'Create Deployment Bill',
 
     'unknown project' => 'unknown project：）',
+    'project deleted' => '(project deleted)',
     'you are not the member of project' => 'you are not the member of project. contact the manger of the project',
     'unknown deployment bill' => 'unknown deployment：）',
     'can\'t delele the job which is done' => 'can\'t delele the job which is done：）',

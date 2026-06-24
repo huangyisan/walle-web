@@ -12,6 +12,7 @@ return [
     'internal error hint' => 'Internal server error. See log file: {path}',
     'deploy step unknown' => 'Unknown step',
     'deploy failed' => 'Deployment failed',
+    'deploy timeout' => 'Deployment timed out after 10 minutes, no retry. Please check the server/logs.',
     'error title' => 'deploy error:（',
     'done' => 'Deployment done: )',
     'done praise' => 'Well done：）',

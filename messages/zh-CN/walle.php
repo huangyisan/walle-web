@@ -12,6 +12,7 @@ return [
     'internal error hint' => '服务器内部错误，详情请查看日志：{path}',
     'deploy step unknown' => '未知步骤',
     'deploy failed' => '部署失败',
+    'deploy timeout' => '部署超过10分钟未完成，已判定失败，不会重试，请检查服务器/日志',
     'error title' => '上线出错:（',
     'done' => '上线成功: )',
     'done praise' => '辛苦了，小主：）',

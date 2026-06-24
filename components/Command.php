@@ -32,6 +32,14 @@ class Command {
     /** @var bool post_deploy 等长任务需 proc_open 分通道捕获输出 */
     protected $captureOutputViaProcOpen = false;
 
+    /**
+     * 单条命令最长允许执行时间（秒），超时直接判失败，不重试
+     */
+    const MAX_EXEC_SECONDS = 600;
+
+    /** @var bool|null 宿主机是否有 coreutils timeout 命令，缓存检测结果 */
+    protected static $hasTimeoutBin = null;
+
     protected $command = '';
 
     protected $log = null;
@@ -91,6 +99,9 @@ class Command {
                 stream_set_blocking($pipes[1], false);
                 stream_set_blocking($pipes[2], false);
 
+                $deadline = microtime(true) + self::MAX_EXEC_SECONDS;
+                $timedOut = false;
+
                 while (true) {
                     $read = [];
                     if (!feof($pipes[1])) {
@@ -100,6 +111,12 @@ class Command {
                         $read[] = $pipes[2];
                     }
                     if (empty($read)) {
+                        break;
+                    }
+                    if (microtime(true) >= $deadline) {
+                        // 超时直接杀进程组，不重试，避免被后台残留子进程的管道挂死
+                        $timedOut = true;
+                        @proc_terminate($process, 9);
                         break;
                     }
                     $write = null;
@@ -124,6 +141,13 @@ class Command {
                 fclose($pipes[1]);
                 fclose($pipes[2]);
                 $status = proc_close($process);
+                if ($timedOut) {
+                    $status = 124;
+                    $stderr .= PHP_EOL . sprintf(
+                        '[timeout] command exceeded %d s and was killed, no retry',
+                        self::MAX_EXEC_SECONDS
+                    );
+                }
             } else {
                 return $this->runLocalCommandViaExec($command);
             }
@@ -143,10 +167,35 @@ class Command {
     protected function runLocalCommandViaExec($command) {
         $status = 1;
         $output = [];
-        exec($command . ' 2>&1', $output, $status);
+        $wrapped = $this->wrapWithTimeout($command);
+        exec($wrapped . ' 2>&1', $output, $status);
         $log = implode(PHP_EOL, $output);
 
+        // timeout 命令在超时时杀掉子进程后返回 124，不重试，直接按失败处理
+        if ($status === 124) {
+            $log = rtrim($log . PHP_EOL) . PHP_EOL
+                . sprintf('[timeout] command exceeded %d s and was killed, no retry', self::MAX_EXEC_SECONDS);
+        }
+
         return $this->finalizeCommandResult($command, $status, $log, '');
+    }
+
+    /**
+     * 用 coreutils timeout 包一层，超时后 SIGTERM，5s 后 SIGKILL，杜绝命令卡死整个请求
+     * 没有 timeout 命令的环境直接跳过包装（极少见，宿主机为非 Linux 环境时）
+     *
+     * @param string $command
+     * @return string
+     */
+    protected function wrapWithTimeout($command) {
+        if (self::$hasTimeoutBin === null) {
+            exec('command -v timeout 2>/dev/null', $out, $code);
+            self::$hasTimeoutBin = ($code === 0 && !empty($out));
+        }
+        if (!self::$hasTimeoutBin) {
+            return $command;
+        }
+        return sprintf('timeout -k 5 %d %s', self::MAX_EXEC_SECONDS, $command);
     }
 
     /**
@@ -204,7 +253,9 @@ class Command {
 
         foreach (GlobalHelper::str2arr($this->getConfig()->hosts) as $remoteHost) {
 
-            $localCommand = sprintf('ssh %s -p %d -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o CheckHostIP=false %s@%s %s',
+            // ConnectTimeout 限制建连阶段；ServerAlive* 保证连上后对端假死/网络静默丢包时也能在数十秒内探测断开
+            // 不依赖这两个参数兜底超时：最终仍由 wrapWithTimeout 的 MAX_EXEC_SECONDS 做整体硬限制
+            $localCommand = sprintf('ssh %s -p %d -q -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o CheckHostIP=false -o ConnectTimeout=10 -o ServerAliveInterval=5 -o ServerAliveCountMax=3 %s@%s %s',
                 $needTTY,
                 $this->getHostPort($remoteHost),
                 escapeshellarg($this->getConfig()->release_user),
