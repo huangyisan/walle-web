@@ -114,6 +114,9 @@ use yii\helpers\Url;
             // 前端兜底：最长等待 10 分钟，不重试，超时直接判失败提示用户去看服务器/日志
             var DEPLOY_MAX_WAIT_MS = 10 * 60 * 1000;
             var deployStartedAt = Date.now();
+            // 传给 get-process 用于过滤掉"重新发起部署"时竞态读到的上一次失败记录；
+            // 减 10s 兜底客户端/服务端时钟误差，不影响真实失败的判定（真实失败的 record 必然晚于此时间）
+            var sinceTs = Math.floor(deployStartedAt / 1000) - 10;
             function markDeploySuccess() {
                 deployFinished = true;
                 $('.progress-status').removeClass('progress-bar-danger').removeClass('progress-bar-striped').addClass('progress-bar-success');
@@ -165,7 +168,7 @@ use yii\helpers\Url;
                 if (deployFinished) {
                     return;
                 }
-                $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id, function (process) {
+                $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id + "&since=" + sinceTs, function (process) {
                     var data = process.data || {};
                     applyProcessUi(data);
                     if (isDeployDone(data)) {
@@ -217,7 +220,7 @@ use yii\helpers\Url;
                     markDeployTimeout();
                     return;
                 }
-                $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id, function (o) {
+                $.get("<?= Url::to('@web/walle/get-process?taskId=') ?>" + task_id + "&since=" + sinceTs, function (o) {
                     var data = o.data || {};
                     applyProcessUi(data);
                     if (isDeployDone(data)) {

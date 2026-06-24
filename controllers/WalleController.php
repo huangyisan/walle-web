@@ -436,13 +436,13 @@ class WalleController extends Controller {
      *
      * @param $taskId
      */
-    public function actionGetProcess($taskId) {
+    public function actionGetProcess($taskId, $since = 0) {
         $this->task = TaskModel::findOne($taskId);
         if (!$this->task) {
             $this->renderJson([], self::FAIL, yii::t('walle', 'deployment id not exists'));
             return;
         }
-        $payload = $this->buildDeployProcessPayload();
+        $payload = $this->buildDeployProcessPayload('', (int)$since);
         if ((int)$payload['status'] === 0) {
             LogHelper::deployDecision('get_process_poll_failed', [
                 'task_id' => (int)$this->task->id,
@@ -465,24 +465,26 @@ class WalleController extends Controller {
      * 组装部署进度/失败详情（供轮询与 start-deploy 失败响应）
      *
      * @param string $fallbackMsg
+     * @param int    $since 仅认 created_at >= since 的 record；用于过滤掉"重新发起部署"时
+     *                       start-deploy 还没来得及 deleteAll 旧记录前，轮询竞态读到的上一次记录
      * @return array
      */
-    protected function buildDeployProcessPayload($fallbackMsg = '') {
+    protected function buildDeployProcessPayload($fallbackMsg = '', $since = 0) {
         $taskStatus = (int)$this->task->status;
         $record = null;
         if ($fallbackMsg !== '') {
-            $record = Record::find()
-                ->where(['task_id' => $this->task->id, 'status' => 0])
-                ->orderBy(['id' => SORT_DESC])
-                ->asArray()
-                ->one();
+            $query = Record::find()->where(['task_id' => $this->task->id, 'status' => 0]);
+            if ($since > 0) {
+                $query->andWhere(['>=', 'created_at', $since]);
+            }
+            $record = $query->orderBy(['id' => SORT_DESC])->asArray()->one();
         }
         if (!$record) {
-            $record = Record::find()
-                ->where(['task_id' => $this->task->id])
-                ->orderBy(['id' => SORT_DESC])
-                ->asArray()
-                ->one();
+            $query = Record::find()->where(['task_id' => $this->task->id]);
+            if ($since > 0) {
+                $query->andWhere(['>=', 'created_at', $since]);
+            }
+            $record = $query->orderBy(['id' => SORT_DESC])->asArray()->one();
         }
 
         if ($taskStatus === TaskModel::STATUS_DONE) {
@@ -497,12 +499,13 @@ class WalleController extends Controller {
         }
 
         if (!$record) {
+            // 还未写入首条 record 时视为进行中；仅在显式失败（fallbackMsg）时标记失败。
+            // 注意：重新发起部署时，start-deploy 请求内部先 deleteAll 旧 record 再把 task.status 由
+            // FAILED 改回 PASS，这中间有竞态窗口——轮询的 get-process 可能在重置完成前打进来，读到的
+            // task.status 还是上一次遗留的 FAILED。这里不能再用残留的 FAILED 状态判定"这次也失败了"，
+            // 否则点击重新部署会立刻把上一次的失败结果误判为本次失败（get-process 仅在发起部署时才会被轮询）。
             $isFailed = ($fallbackMsg !== '');
-            if ($taskStatus === TaskModel::STATUS_FAILED) {
-                $isFailed = true;
-            }
             return [
-                // 还未写入首条 record 时视为进行中；仅在显式失败（fallbackMsg）时标记失败
                 'status'      => $isFailed ? 0 : 1,
                 'percent'     => 0,
                 'step'        => 0,
